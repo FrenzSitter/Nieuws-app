@@ -59,7 +59,7 @@ export default function BreakingNews({
 
           {/* News content */}
           <div className="flex-1 min-w-0">
-            <Link href={currentItem.href} className="block group">
+            <Link href={currentItem.href as any} className="block group">
               <div className="flex items-center justify-between">
                 <p className="text-lg font-semibold leading-tight group-hover:text-gray-200 transition-colors truncate pr-4">
                   {currentItem.title}
