@@ -44,7 +44,7 @@ export default function NewsCard({
   }
 
   return (
-    <Link href={cardHref}>
+    <Link href={cardHref as any}>
       <article className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-xl border border-gray-200/50 dark:border-gray-700/50 hover:shadow-lg transition-all duration-300 hover:scale-[1.02] overflow-hidden group">
         {/* Image */}
         {imageUrl && (

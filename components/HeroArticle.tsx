@@ -40,7 +40,7 @@ export default function HeroArticle({
   }
 
   return (
-    <Link href={`/article/${id}`}>
+    <Link href={`/article/${id}` as any}>
       <article className="relative bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl border border-gray-200/50 dark:border-gray-700/50 hover:shadow-2xl transition-all duration-500 hover:scale-[1.01] overflow-hidden group">
         {/* Hero Image */}
         <div className="relative aspect-[21/9] lg:aspect-[3/1] overflow-hidden">

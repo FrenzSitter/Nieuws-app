@@ -122,7 +122,7 @@ export default function CategoryNav({
         {categories.map((category) => {
           const active = isActive(category)
           return (
-            <Link key={category.id} href={category.href}>
+            <Link key={category.id} href={category.href as any}>
               <div className={`
                 flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200
                 ${active 
@@ -169,7 +169,7 @@ export default function CategoryNav({
               {categories.map((category) => {
                 const active = isActive(category)
                 return (
-                  <Link key={category.id} href={category.href} onClick={() => setIsOpen(false)}>
+                  <Link key={category.id} href={category.href as any} onClick={() => setIsOpen(false)}>
                     <div className={`
                       flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-200 text-sm
                       ${active 
@@ -197,7 +197,7 @@ export default function CategoryNav({
         {categories.map((category) => {
           const active = isActive(category)
           return (
-            <Link key={category.id} href={category.href}>
+            <Link key={category.id} href={category.href as any}>
               <div className={`
                 flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 whitespace-nowrap
                 ${active 

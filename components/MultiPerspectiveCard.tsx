@@ -79,7 +79,7 @@ export default function MultiPerspectiveCard({
   }, {} as Record<string, number>)
 
   return (
-    <Link href={cardHref}>
+    <Link href={cardHref as any}>
       <article className="bg-gradient-to-br from-white/80 to-gray-50/80 dark:from-gray-800/80 dark:to-gray-900/80 backdrop-blur-sm rounded-xl border border-gray-200/50 dark:border-gray-700/50 hover:shadow-xl transition-all duration-300 hover:scale-[1.02] overflow-hidden group">
         {/* Header */}
         <div className="p-5 pb-0">
