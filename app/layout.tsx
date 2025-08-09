@@ -1,11 +1,17 @@
-import { Inter, Source_Serif_4 } from 'next/font/google'
+import { Inter } from 'next/font/google'
 import './globals.css'
 
-const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
-const sourceSerif = Source_Serif_4({ 
+const inter = Inter({ 
   subsets: ['latin'], 
-  variable: '--font-source-serif',
-  weight: ['400', '600', '700']
+  variable: '--font-inter',
+  weight: ['400', '500', '600', '700', '800']
+})
+
+const interDisplay = Inter({ 
+  subsets: ['latin'], 
+  variable: '--font-inter-display',
+  weight: ['400', '500', '600', '700', '800'],
+  display: 'swap'
 })
 
 export const metadata = {
@@ -20,29 +26,34 @@ export default function RootLayout({
 }) {
   return (
     <html lang="nl">
-      <body className={`${inter.variable} ${sourceSerif.variable} font-serif`}>
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-          <header className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-              <div className="flex justify-between items-center py-4">
-                <div className="flex items-center">
+      <body className={`${inter.variable} ${interDisplay.variable} font-sans antialiased`}>
+        <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
+          <header className="sticky top-0 z-50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-b border-gray-200/50 dark:border-gray-700/50">
+            <div className="max-w-[1320px] mx-auto px-6 sm:px-8 lg:px-12">
+              <div className="flex justify-between items-center h-16">
+                <div className="flex items-center space-x-4">
                   <div className="flex items-center space-x-3">
-                    <h1 className="text-2xl font-bold font-sans text-gray-900 dark:text-gray-100">
-                      Nonbulla
-                    </h1>
-                    <span className="text-sm text-gray-600 dark:text-gray-400 font-sans">
-                      Nieuws buiten je bubbel
-                    </span>
+                    <div className="w-8 h-8 bg-gradient-to-br from-nonbulla-blue-600 to-nonbulla-blue-700 rounded-lg flex items-center justify-center">
+                      <span className="text-white font-bold text-lg">N</span>
+                    </div>
+                    <div className="flex flex-col">
+                      <h1 className="text-xl font-bold font-display text-gray-900 dark:text-gray-100 leading-none">
+                        Nonbulla
+                      </h1>
+                      <span className="text-xs text-gray-500 dark:text-gray-400 font-medium leading-none">
+                        Nieuws buiten je bubbel
+                      </span>
+                    </div>
                   </div>
                 </div>
-                <nav className="hidden md:flex space-x-8">
-                  <a href="/" className="text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100">
+                <nav className="hidden md:flex items-center space-x-8">
+                  <a href="/" className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 font-medium transition-colors duration-200">
                     Overzicht
                   </a>
-                  <a href="/trending" className="text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100">
+                  <a href="/trending" className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 font-medium transition-colors duration-200">
                     Trending
                   </a>
-                  <a href="/categories" className="text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100">
+                  <a href="/categories" className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 font-medium transition-colors duration-200">
                     Categorieën
                   </a>
                 </nav>
@@ -50,14 +61,22 @@ export default function RootLayout({
             </div>
           </header>
           
-          <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <main className="max-w-[1320px] mx-auto px-6 sm:px-8 lg:px-12 py-12">
             {children}
           </main>
           
-          <footer className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 mt-12">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-              <div className="text-center text-gray-500 dark:text-gray-400">
-                <p>&copy; 2025 Nonbulla. Alle rechten voorbehouden.</p>
+          <footer className="bg-gray-50/50 dark:bg-gray-900/50 border-t border-gray-200/50 dark:border-gray-700/50 mt-24">
+            <div className="max-w-[1320px] mx-auto px-6 sm:px-8 lg:px-12 py-12">
+              <div className="text-center">
+                <div className="flex items-center justify-center space-x-3 mb-4">
+                  <div className="w-6 h-6 bg-gradient-to-br from-nonbulla-blue-600 to-nonbulla-blue-700 rounded-md flex items-center justify-center">
+                    <span className="text-white font-bold text-sm">N</span>
+                  </div>
+                  <span className="text-gray-700 dark:text-gray-300 font-semibold">Nonbulla</span>
+                </div>
+                <p className="text-gray-500 dark:text-gray-400 text-sm">
+                  &copy; 2025 Nonbulla. Alle rechten voorbehouden.
+                </p>
               </div>
             </div>
           </footer>

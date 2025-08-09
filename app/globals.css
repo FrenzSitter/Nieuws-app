@@ -4,20 +4,31 @@
 
 :root {
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #111827;
+  --background-secondary: #f9fafb;
+  --surface: #ffffff;
+  --border: #e5e7eb;
+  --border-secondary: #d1d5db;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #0f172a;
+    --foreground: #f1f5f9;
+    --background-secondary: #1e293b;
+    --surface: #1e293b;
+    --border: #334155;
+    --border-secondary: #475569;
   }
 }
 
 body {
   color: var(--foreground);
   background: var(--background);
-  font-family: var(--font-source-serif-pro), 'Source Serif Pro', serif;
+  font-family: var(--font-inter), 'Inter', system-ui, sans-serif;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 @layer utilities {
@@ -27,41 +38,101 @@ body {
 }
 
 @layer components {
+  /* NewsFlash-inspired Design System */
   .news-card {
-    @apply bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow;
+    @apply bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-200/50 dark:border-gray-700/50 hover:shadow-xl transition-all duration-300 hover:scale-[1.02];
   }
   
   .news-card-title {
-    @apply font-semibold text-gray-900 dark:text-gray-100 line-clamp-3;
+    @apply font-semibold text-gray-900 dark:text-gray-100 line-clamp-3 text-lg leading-tight;
   }
   
   .news-card-content {
-    @apply text-gray-600 dark:text-gray-300 text-sm line-clamp-2;
+    @apply text-gray-600 dark:text-gray-300 text-sm line-clamp-2 leading-relaxed;
   }
   
   .news-meta {
-    @apply text-xs text-gray-500 dark:text-gray-400;
+    @apply text-xs text-gray-500 dark:text-gray-400 font-medium;
   }
   
-  /* Nonbulla Design System Components */
-  .perspective-card {
-    @apply rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1;
+  /* Sophisticated Card Components */
+  .feature-card-modern {
+    @apply bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-2xl p-8 border border-gray-200/50 dark:border-gray-700/50 hover:shadow-xl transition-all duration-300 hover:scale-[1.02];
   }
   
-  .feature-card {
-    @apply bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-all duration-300 hover:border-nonbulla-blue-300 dark:hover:border-nonbulla-blue-600;
+  .stats-card {
+    @apply bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-xl p-8 text-center border border-gray-200/50 dark:border-gray-700/50 hover:shadow-lg transition-all duration-300 hover:scale-[1.02];
   }
   
-  .perspective-chip {
-    @apply px-3 py-1 rounded-full text-sm font-medium border transition-colors duration-200 hover:shadow-sm;
+  .source-chip {
+    @apply px-6 py-3 bg-white/70 dark:bg-gray-800/70 border border-gray-200/50 dark:border-gray-700/50 text-gray-800 dark:text-gray-200 rounded-xl text-sm font-medium backdrop-blur-sm hover:shadow-lg transition-all duration-300 hover:scale-105;
   }
   
-  /* Typography helpers */
-  .nonbulla-heading {
-    @apply font-sans font-bold text-gray-900 dark:text-gray-100;
+  /* Button Components */
+  .btn-primary {
+    @apply px-8 py-4 bg-nonbulla-blue-600 hover:bg-nonbulla-blue-700 text-white font-semibold rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-xl;
   }
   
-  .nonbulla-body {
-    @apply font-serif text-gray-600 dark:text-gray-300 leading-relaxed;
+  .btn-secondary {
+    @apply px-8 py-4 border-2 border-gray-300 hover:border-gray-400 text-gray-700 dark:text-gray-300 dark:border-gray-600 dark:hover:border-gray-500 font-semibold rounded-lg transition-all duration-200 hover:bg-gray-50 dark:hover:bg-gray-800;
+  }
+  
+  .btn-cta-primary {
+    @apply px-10 py-5 bg-gradient-to-r from-nonbulla-blue-600 to-nonbulla-blue-700 hover:from-nonbulla-blue-700 hover:to-nonbulla-blue-800 text-white font-semibold rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl;
+  }
+  
+  .btn-cta-secondary {
+    @apply px-10 py-5 bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500 text-gray-700 dark:text-gray-300 font-semibold rounded-xl transition-all duration-300 hover:shadow-lg;
+  }
+  
+  /* Icon Containers */
+  .icon-gradient-blue {
+    @apply w-12 h-12 bg-gradient-to-br from-nonbulla-blue-500 to-nonbulla-blue-600 rounded-xl flex items-center justify-center;
+  }
+  
+  .icon-gradient-purple {
+    @apply w-12 h-12 bg-gradient-to-br from-analysis-purple-500 to-analysis-purple-600 rounded-xl flex items-center justify-center;
+  }
+  
+  .icon-gradient-coral {
+    @apply w-12 h-12 bg-gradient-to-br from-accent-coral-500 to-accent-coral-600 rounded-xl flex items-center justify-center;
+  }
+  
+  .icon-gradient-green {
+    @apply w-12 h-12 bg-gradient-to-br from-perspective-green-500 to-perspective-green-600 rounded-xl flex items-center justify-center;
+  }
+  
+  /* Typography Components */
+  .heading-hero {
+    @apply text-5xl sm:text-6xl lg:text-7xl font-display font-extrabold text-gray-900 dark:text-gray-100 leading-[1.1] tracking-tight;
+  }
+  
+  .heading-section {
+    @apply text-4xl font-display font-bold text-gray-900 dark:text-gray-100;
+  }
+  
+  .heading-card {
+    @apply text-xl font-semibold text-gray-900 dark:text-gray-100;
+  }
+  
+  .text-hero {
+    @apply text-xl sm:text-2xl text-gray-600 dark:text-gray-300 leading-relaxed font-medium;
+  }
+  
+  .text-section {
+    @apply text-lg text-gray-600 dark:text-gray-400;
+  }
+  
+  .text-body {
+    @apply text-gray-600 dark:text-gray-300 leading-relaxed;
+  }
+  
+  /* Gradient Text */
+  .gradient-text-primary {
+    @apply bg-gradient-to-r from-nonbulla-blue-600 via-nonbulla-blue-700 to-accent-coral-500 bg-clip-text text-transparent;
+  }
+  
+  .gradient-text-secondary {
+    @apply bg-gradient-to-r from-nonbulla-blue-600 to-perspective-green-600 bg-clip-text text-transparent;
   }
 }

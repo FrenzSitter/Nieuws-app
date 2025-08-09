@@ -7,6 +7,14 @@ module.exports = {
   ],
   theme: {
     extend: {
+      screens: {
+        'xs': '390px',
+        'sm': '640px',
+        'md': '810px',
+        'lg': '1024px',
+        'xl': '1200px',
+        '2xl': '1320px',
+      },
       colors: {
         background: 'var(--background)',
         foreground: 'var(--foreground)',
@@ -86,7 +94,14 @@ module.exports = {
       },
       fontFamily: {
         'sans': ['var(--font-inter)', 'Inter', 'system-ui', 'sans-serif'],
-        'serif': ['var(--font-source-serif)', 'Source Serif 4', 'serif'],
+        'display': ['var(--font-inter-display)', 'Inter', 'system-ui', 'sans-serif'],
+      },
+      fontWeight: {
+        'normal': '400',
+        'medium': '500',
+        'semibold': '600',
+        'bold': '700',
+        'extrabold': '800',
       },
       typography: {
         DEFAULT: {
