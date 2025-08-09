@@ -86,13 +86,13 @@ module.exports = {
       },
       fontFamily: {
         'sans': ['var(--font-inter)', 'Inter', 'system-ui', 'sans-serif'],
-        'serif': ['var(--font-source-serif-pro)', 'Source Serif Pro', 'serif'],
+        'serif': ['var(--font-source-serif)', 'Source Serif 4', 'serif'],
       },
       typography: {
         DEFAULT: {
           css: {
             maxWidth: 'none',
-            fontFamily: 'var(--font-source-serif-pro)',
+            fontFamily: 'var(--font-source-serif)',
           }
         }
       }

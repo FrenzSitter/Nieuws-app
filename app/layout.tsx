@@ -1,11 +1,10 @@
-import { Inter } from 'next/font/google'
-import { Source_Serif_Pro } from 'next/font/google'
+import { Inter, Source_Serif_4 } from 'next/font/google'
 import './globals.css'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
-const sourceSerifPro = Source_Serif_Pro({ 
+const sourceSerif = Source_Serif_4({ 
   subsets: ['latin'], 
-  variable: '--font-source-serif-pro',
+  variable: '--font-source-serif',
   weight: ['400', '600', '700']
 })
 
@@ -21,7 +20,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="nl">
-      <body className={`${inter.variable} ${sourceSerifPro.variable} font-serif`}>
+      <body className={`${inter.variable} ${sourceSerif.variable} font-serif`}>
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
           <header className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
