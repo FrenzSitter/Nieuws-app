@@ -1,28 +1,30 @@
-# Nieuws App 📰
+# Nonbulla – Nieuws buiten je bubbel 🌐
 
-Een moderne nieuws aggregator die verschillende perspectieven combineert om een compleet beeld van het nieuws te geven. Gebouwd met Next.js 14 en Supabase.
+Doorbreek je nieuwsbubbel met multi-perspectief AI-analyse. Nonbulla toont verhalen vanuit verschillende invalshoeken, zodat je een completer beeld krijgt van de werkelijkheid. Gebouwd met Next.js 14 en Supabase.
 
 ## 🚀 Features
 
-- **Multi-perspective Nieuws**: Zie hoe verschillende bronnen hetzelfde verhaal brengen
-- **AI-gestuurde Samenvatting**: Automatisch gegenereerde samenvattingen van complexe verhalen
-- **Real-time Updates**: 24/7 monitoring van Nederlandse nieuwsbronnen
-- **Trending Topics**: Ontdek wat er nu belangrijk is
-- **Responsive Design**: Werkt perfect op desktop, tablet en mobiel
-- **Dark/Light Mode**: Aangepaste gebruikerservaring
+- **Bubble-Breaking Technology**: Doorbreek je nieuwsbubbel met AI-analyse vanuit meerdere perspectieven
+- **Perspective Chips**: Duidelijke bronvermelding met politieke context (Links, Centrum, Rechts)
+- **Intelligent Synthesis**: AI-gestuurde samenvattingen die verschillende invalshoeken belichten
+- **Bewuste Nieuwszoekers**: Ontworpen voor de doelgroep van 25-45 jaar, hoogopgeleid en politiek geëngageerd
+- **Mobile-First Design**: Geoptimaliseerd voor 70% mobiel verkeer met scanbare layouts
+- **Premium UX**: Moderne, professionele interface geïnspireerd door AllSides.com en NU.nl
 
 ## 🛠️ Tech Stack
 
 - **Frontend**: Next.js 14, TypeScript, Tailwind CSS
+- **Typography**: Inter (headings) + Source Serif Pro (body)
+- **Design System**: Nonbulla Brand Colors (Blue #2563EB, Coral #F97316, Green #059669, Purple #7C3AED)
 - **Backend**: Supabase (PostgreSQL, Auth, Real-time)
 - **Deployment**: Vercel
-- **UI Components**: Lucide React Icons
-- **Styling**: Tailwind CSS + Custom Components
+- **Icons**: Custom SVG + Lucide React
+- **Styling**: Tailwind CSS + Nonbulla Component System
 
 ## 📦 Project Structure
 
 ```
-nieuws-app/
+nonbulla/
 ├── app/                    # Next.js 14 App Router
 │   ├── globals.css        # Global styles
 │   ├── layout.tsx         # Root layout
@@ -94,9 +96,9 @@ Het project gebruikt een uitgebreide PostgreSQL database met:
 
 ## 🌐 Deployment
 
-Het project is geconfigureerd voor automatische deployment op Vercel:
+Nonbulla is geconfigureerd voor automatische deployment op Vercel:
 
-1. **Vercel Project**: [nieuws-app.vercel.app](https://nieuws-app.vercel.app)
+1. **Vercel Project**: [nieuws-app.vercel.app](https://nieuws-app.vercel.app) (Nonbulla branded)
 2. **Supabase Project**: lstcnbrikiqbjbhdnqor.supabase.co
 3. **GitHub Repository**: [FrenzSitter/Nieuws-app](https://github.com/FrenzSitter/Nieuws-app)
 
@@ -157,4 +159,13 @@ Dit project is licensed onder de MIT License - zie het [LICENSE](LICENSE) bestan
 
 ---
 
-**Nieuws App** - *Think different about news* 🧠✨
+**Nonbulla** - *Nieuws buiten je bubbel* 🌐✨
+
+## 🎯 Brand Identity
+
+**Nonbulla** (Latin: non + bulla = no bubble) is positioned as intelligent yet accessible - like a well-informed friend explaining complex situations from multiple angles.
+
+- **Mission**: Breaking news bubbles through multi-perspective AI-generated articles
+- **Target**: Bewuste Nieuwszoekers (25-45), educated, politically engaged
+- **Voice**: Curious, respectful, nuanced - "Bekijk dit eens vanuit een ander perspectief..."
+- **Visual**: Modern, trustworthy design that appeals to educated news consumers

@@ -17,7 +17,7 @@
 body {
   color: var(--foreground);
   background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-source-serif-pro), 'Source Serif Pro', serif;
 }
 
 @layer utilities {
@@ -41,5 +41,27 @@ body {
   
   .news-meta {
     @apply text-xs text-gray-500 dark:text-gray-400;
+  }
+  
+  /* Nonbulla Design System Components */
+  .perspective-card {
+    @apply rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1;
+  }
+  
+  .feature-card {
+    @apply bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-all duration-300 hover:border-nonbulla-blue-300 dark:hover:border-nonbulla-blue-600;
+  }
+  
+  .perspective-chip {
+    @apply px-3 py-1 rounded-full text-sm font-medium border transition-colors duration-200 hover:shadow-sm;
+  }
+  
+  /* Typography helpers */
+  .nonbulla-heading {
+    @apply font-sans font-bold text-gray-900 dark:text-gray-100;
+  }
+  
+  .nonbulla-body {
+    @apply font-serif text-gray-600 dark:text-gray-300 leading-relaxed;
   }
 }

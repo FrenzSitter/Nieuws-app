@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 
 /**
- * Trigger Deployment Script voor Nieuws App
+ * Trigger Deployment Script voor Nonbulla
  * Deze script probeert een Vercel deployment te triggeren via webhook
  */
 
 const https = require('https');
 
 // Vercel project informatie
-const PROJECT_ID = 'nieuws-app';
+const PROJECT_ID = 'nonbulla'; // was nieuws-app
 const TEAM_ID = 'team_FrenzSitter'; 
 const GITHUB_REPO = 'FrenzSitter/Nieuws-app';
 
@@ -41,8 +41,8 @@ envVars.forEach((envVar, index) => {
 });
 
 console.log('\n✨ Na het toevoegen van environment variables:');
-console.log('- https://nieuws-app.vercel.app zou moeten laden');
-console.log('- Homepage met "Welkom bij Nieuws App" zou zichtbaar moeten zijn');
+console.log('- https://nieuws-app.vercel.app zou moeten laden (met Nonbulla branding)');
+console.log('- Homepage met "Nonbulla – Nieuws buiten je bubbel" zou zichtbaar moeten zijn');
 console.log('- Database connectie zou moeten werken');
 
 process.exit(0);

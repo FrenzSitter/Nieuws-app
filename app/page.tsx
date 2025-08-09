@@ -142,19 +142,22 @@ export default async function Home() {
       )}
 
       {/* CTA Section */}
-      <div className="text-center space-y-4 py-8">
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-          Klaar om te beginnen?
-        </h2>
-        <p className="text-gray-600 dark:text-gray-300">
-          Ontdek hoe nieuws er uitziet wanneer je het vanuit verschillende hoeken bekijkt.
-        </p>
-        <div className="space-x-4">
-          <button className="bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-lg font-medium transition-colors">
-            Bekijk Trending Nieuws
+      <div className="text-center space-y-6 py-12 bg-gradient-to-br from-nonbulla-blue-50 to-perspective-green-50 dark:from-nonbulla-blue-900/10 dark:to-perspective-green-900/10 -mx-4 px-4 rounded-2xl">
+        <div className="space-y-4">
+          <h2 className="text-3xl font-bold font-sans text-gray-900 dark:text-gray-100">
+            Stap uit je bubbel
+          </h2>
+          <p className="text-lg text-gray-600 dark:text-gray-300 font-serif max-w-2xl mx-auto">
+            Ontdek wat je mist wanneer je nieuws alleen vanuit één perspectief bekijkt. 
+            Begin vandaag met een completer beeld van de werkelijkheid.
+          </p>
+        </div>
+        <div className="flex flex-col sm:flex-row gap-4 justify-center items-center max-w-md mx-auto">
+          <button className="w-full sm:w-auto bg-nonbulla-blue-600 hover:bg-nonbulla-blue-700 text-white px-8 py-4 rounded-lg font-bold font-sans transition-all transform hover:scale-105 shadow-lg">
+            Verken Perspectieven
           </button>
-          <button className="border border-gray-300 hover:border-gray-400 text-gray-700 dark:text-gray-300 px-6 py-3 rounded-lg font-medium transition-colors">
-            Browse Categorieën
+          <button className="w-full sm:w-auto border-2 border-nonbulla-blue-600 hover:bg-nonbulla-blue-50 text-nonbulla-blue-700 dark:text-nonbulla-blue-300 dark:hover:bg-nonbulla-blue-900/20 px-8 py-4 rounded-lg font-bold font-sans transition-all">
+            Trending Nu
           </button>
         </div>
       </div>

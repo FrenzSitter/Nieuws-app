@@ -1,8 +1,8 @@
 {
-  "name": "nieuws-app",
+  "name": "nonbulla",
   "version": "0.1.0",
   "private": true,
-  "description": "Een moderne nieuws applicatie gebouwd met Next.js en Supabase",
+  "description": "Nonbulla - Nieuws buiten je bubbel. Multi-perspectief nieuwsanalyse met AI.",
   "author": "FrenzSitter",
   "license": "MIT",
   "scripts": {
