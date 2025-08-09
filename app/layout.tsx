@@ -46,16 +46,37 @@ export default function RootLayout({
                     </div>
                   </div>
                 </div>
-                <nav className="hidden md:flex items-center space-x-8">
+                <nav className="hidden md:flex items-center space-x-6">
                   <a href="/" className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 font-medium transition-colors duration-200">
                     Overzicht
                   </a>
-                  <a href="/trending" className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 font-medium transition-colors duration-200">
-                    Trending
+                  <a href="/category/politics" className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 font-medium transition-colors duration-200">
+                    Politiek
                   </a>
-                  <a href="/categories" className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 font-medium transition-colors duration-200">
-                    Categorieën
+                  <a href="/category/technology" className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 font-medium transition-colors duration-200">
+                    Tech
                   </a>
+                  <a href="/category/world" className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 font-medium transition-colors duration-200">
+                    Wereld
+                  </a>
+                  <a href="/perspectives" className="text-perspective-green-600 dark:text-perspective-green-400 hover:text-perspective-green-700 dark:hover:text-perspective-green-300 font-semibold transition-colors duration-200 flex items-center gap-1">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Perspectieven
+                  </a>
+                  
+                  {/* Search */}
+                  <div className="relative">
+                    <input
+                      type="search"
+                      placeholder="Zoek nieuws..."
+                      className="pl-10 pr-4 py-2 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-nonbulla-blue-500 focus:border-nonbulla-blue-500 w-48"
+                    />
+                    <svg className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </div>
                 </nav>
               </div>
             </div>
