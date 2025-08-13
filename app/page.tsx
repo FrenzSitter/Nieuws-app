@@ -1,16 +1,13 @@
 import { createClient } from '@/lib/supabase/server'
-import BreakingNews from '@/components/BreakingNews'
+import ManifestBar from '@/components/ManifestBar'
 import CategoryNav from '@/components/CategoryNav'
 import HeroArticle from '@/components/HeroArticle'
 import NewsCard from '@/components/NewsCard'
 import MultiPerspectiveCard from '@/components/MultiPerspectiveCard'
+import { rssManager } from '@/lib/rss-parser'
 import {
-  breakingNews,
   heroArticles,
-  newsArticles,
-  multiPerspectiveArticles,
-  getLatestArticles,
-  getTrendingArticles
+  multiPerspectiveArticles
 } from '@/lib/sampleNews'
 
 export default async function Home() {
@@ -23,18 +20,42 @@ export default async function Home() {
     .eq('is_active', true)
     .limit(5)
 
-  // Get curated content
-  const latestNews = getLatestArticles(8)
-  const trendingNews = getTrendingArticles(4)
+  // Fetch real articles from database
+  const latestArticles = await rssManager.getRecentArticles(12)
+  const trendingArticles = await rssManager.getRecentArticles(4)
+
+  // Transform articles for UI components
+  const latestNews = latestArticles.map((article, index) => ({
+    id: article.id,
+    title: article.title,
+    summary: article.description || article.content?.substring(0, 150) + '...' || '',
+    imageUrl: '', // We don't have images from RSS yet
+    publishedAt: article.published_at,
+    sources: [{ name: article.news_sources?.name || 'Unknown Source' }],
+    category: article.categories?.[0] || 'algemeen',
+    readingTime: Math.max(1, Math.ceil((article.content?.length || 0) / 200)),
+    perspectiveCount: 1,
+    isBreaking: index < 2 // Mark first 2 as breaking
+  }))
+
+  const trendingNews = trendingArticles.map((article, index) => ({
+    id: article.id,
+    title: article.title,
+    summary: article.description || '',
+    imageUrl: '',
+    publishedAt: article.published_at,
+    sources: [{ name: article.news_sources?.name || 'Unknown Source' }],
+    category: article.categories?.[0] || 'algemeen',
+    readingTime: Math.max(1, Math.ceil((article.content?.length || 0) / 200)),
+    perspectiveCount: 1
+  }))
 
   return (
     <div className="space-y-8">
-      {/* Breaking News Ticker */}
-      {breakingNews.length > 0 && (
-        <div className="-mx-6 sm:-mx-8 lg:-mx-12">
-          <BreakingNews items={breakingNews} />
-        </div>
-      )}
+      {/* Manifest Bar */}
+      <div className="-mt-12">
+        <ManifestBar />
+      </div>
 
       {/* Category Navigation */}
       <CategoryNav />

@@ -1,7 +1,8 @@
 import { notFound } from 'next/navigation'
-import CategoryNav from '@/components/CategoryNav'
+import CategoryBar from '@/components/CategoryBar'
+import CategorySubNav from '@/components/CategorySubNav'
 import NewsCard from '@/components/NewsCard'
-import { getArticlesByCategory, newsArticles } from '@/lib/sampleNews'
+import { rssManager } from '@/lib/rss-parser'
 
 interface CategoryPageProps {
   params: {
@@ -10,25 +11,115 @@ interface CategoryPageProps {
 }
 
 const categoryMap: Record<string, string> = {
+  // Legacy categories (for backwards compatibility)
   'politics': 'Politiek',
-  'technology': 'Technologie',
+  'technology': 'Technologie', 
   'world': 'Wereld',
   'business': 'Economie',
   'sports': 'Sport',
-  'culture': 'Cultuur'
+  'culture': 'Cultuur',
+  
+  // New geographic structure
+  'nederland': 'Nederland',
+  'europa': 'Europa',
+  'wereld': 'Wereld',
+  
+  // Nederland subcategories
+  'nederland-politiek': 'Nederlandse Politiek',
+  'nederland-economie': 'Nederlandse Economie',
+  'nederland-sport': 'Nederlandse Sport',
+  'nederland-wetenschap': 'Nederlandse Wetenschap',
+  'nederland-feiten': 'Nederlandse Feiten',
+  
+  // Europa subcategories
+  'europa-politiek': 'Europese Politiek',
+  'europa-economie': 'Europese Economie',
+  'europa-oorlog': 'Oorlog in Europa',
+  'europa-wetenschap': 'Europese Wetenschap',
+  'europa-feiten': 'Europese Feiten',
+  
+  // Wereld subcategories
+  'wereld-politiek': 'Wereldpolitiek',
+  'wereld-economie': 'Wereldeconomie',
+  'wereld-oorlog': 'Oorlog in de Wereld',
+  'wereld-sport': 'Wereldsport',
+  'wereld-wetenschap': 'Wereldwetenschap',
+  'wereld-feiten': 'Wereldfeiten'
 }
 
 const categoryDescriptions: Record<string, string> = {
+  // Legacy descriptions
   'politics': 'Het laatste politieke nieuws uit Nederland en Europa. Van verkiezingen tot beleidsbeslissingen.',
   'technology': 'Innovatie, AI, startups en de digitale transformatie van Nederland.',
   'world': 'Internationale ontwikkelingen en hun impact op Nederland.',
   'business': 'Economisch nieuws, bedrijfsleven en financiële markten.',
   'sports': 'Nederlandse en internationale sport, van voetbal tot Formule 1.',
-  'culture': 'Kunst, cultuur, entertainment en Nederlandse culturele evenementen.'
+  'culture': 'Kunst, cultuur, entertainment en Nederlandse culturele evenementen.',
+  
+  // Main geographic categories
+  'nederland': 'Al het Nederlandse nieuws op één plek. Van politiek tot sport, van de Randstad tot de provincie.',
+  'europa': 'Europese ontwikkelingen die Nederland raken. Politiek, economie en maatschappij vanuit Europees perspectief.',
+  'wereld': 'Internationale nieuwsgebeurtenissen met wereldwijde impact en hun gevolgen voor Nederland.',
+  
+  // Nederland subcategories
+  'nederland-politiek': 'Nederlandse politiek, verkiezingen, coalitieformatie en beleidsbeslissingen uit Den Haag.',
+  'nederland-economie': 'Nederlandse economie, bedrijfsleven, arbeidsmarkt en financiële ontwikkelingen.',
+  'nederland-sport': 'Nederlandse sport, van Eredivisie tot Olympische Spelen en alles daartussen.',
+  'nederland-wetenschap': 'Nederlandse wetenschappelijke doorbraken, onderzoek en innovatie.',
+  'nederland-feiten': 'Fact-checks, onderzoeksjournalistiek en duiding van Nederlandse nieuwsfeiten.',
+  
+  // Europa subcategories
+  'europa-politiek': 'Europese Unie, verkiezingen en politieke ontwikkelingen die Nederland raken.',
+  'europa-economie': 'Europese economische ontwikkelingen, handel en monetair beleid van de ECB.',
+  'europa-oorlog': 'Conflicten en veiligheidssituatie in Europa, vooral de oorlog in Oekraïne.',
+  'europa-wetenschap': 'Europese wetenschappelijke samenwerking, onderzoek en technologische vooruitgang.',
+  'europa-feiten': 'Fact-checks en analyse van Europese ontwikkelingen en hun impact op Nederland.',
+  
+  // Wereld subcategories
+  'wereld-politiek': 'Internationale politiek, diplomatie en geopolitieke ontwikkelingen wereldwijd.',
+  'wereld-economie': 'Wereldeconomie, internationale handel en financiële markten buiten Europa.',
+  'wereld-oorlog': 'Conflicten en oorlogen wereldwijd en hun internationale gevolgen.',
+  'wereld-sport': 'Internationale sport, Wereldkampioenschappen en sportevenementen buiten Nederland.',
+  'wereld-wetenschap': 'Internationale wetenschappelijke ontwikkelingen en wereldwijde onderzoeksprojecten.',
+  'wereld-feiten': 'Internationale fact-checks en analyse van wereldwijde nieuwsgebeurtenissen.'
 }
 
 const categoryIcons: Record<string, React.ReactNode> = {
+  // Geographic main categories
+  'nederland': (
+    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
+    </svg>
+  ),
+  'europa': (
+    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+  ),
+  'wereld': (
+    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+    </svg>
+  ),
+  
+  // Legacy and specific category icons
   'politics': (
+    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
+    </svg>
+  ),
+  'nederland-politiek': (
+    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
+    </svg>
+  ),
+  'europa-politiek': (
+    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
+    </svg>
+  ),
+  'wereld-politiek': (
     <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
     </svg>
@@ -57,10 +148,17 @@ const categoryIcons: Record<string, React.ReactNode> = {
     <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 4V2a1 1 0 011-1h8a1 1 0 011 1v2m3 0H4a2 2 0 00-2 2v12a2 2 0 002 2h16a2 2 0 002-2V6a2 2 0 00-2-2zM8 10h8M8 14h8M8 18h8" />
     </svg>
+  ),
+  
+  // Use default icon for categories without specific icons
+  'default': (
+    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9.5a2 2 0 00-2-2h-2m-4-3v9" />
+    </svg>
   )
 }
 
-export default function CategoryPage({ params }: CategoryPageProps) {
+export default async function CategoryPage({ params }: CategoryPageProps) {
   const { slug } = params
   
   const categoryName = categoryMap[slug]
@@ -68,19 +166,40 @@ export default function CategoryPage({ params }: CategoryPageProps) {
     notFound()
   }
   
-  const articles = getArticlesByCategory(categoryName)
+  // Fetch real articles from database - map category to database format
+  const dbCategory = slug.split('-')[0] // Extract base category (nederland, europa, wereld)
+  const rawArticles = await rssManager.getArticlesByCategory(dbCategory, 20)
+  
+  // Transform articles for UI components
+  const articles = rawArticles.map(article => ({
+    id: article.id,
+    title: article.title,
+    summary: article.description || article.content?.substring(0, 150) + '...' || '',
+    imageUrl: '', // We don't have images from RSS yet
+    publishedAt: article.published_at,
+    sources: [{ name: article.news_sources?.name || 'Unknown Source' }],
+    category: article.categories?.[0] || dbCategory,
+    readingTime: Math.max(1, Math.ceil((article.content?.length || 0) / 200)),
+    perspectiveCount: 1
+  }))
+  
   const description = categoryDescriptions[slug] || ''
-  const icon = categoryIcons[slug]
+  const icon = categoryIcons[slug] || categoryIcons['default']
   
   // Get some stats for this category
   const totalArticles = articles.length
-  const sourcesUsed = new Set(articles.flatMap(article => article.sources)).size
-  const averagePerspectives = Math.round(
+  const sourcesUsed = new Set(articles.flatMap(article => article.sources.map(s => s.name))).size
+  const averagePerspectives = articles.length > 0 ? Math.round(
     articles.reduce((sum, article) => sum + article.perspectiveCount, 0) / articles.length
-  )
+  ) : 1
 
   return (
     <div className="space-y-8">
+      {/* Category Bar */}
+      <div className="-mt-12">
+        <CategoryBar currentSlug={`/category/${slug}`} />
+      </div>
+
       {/* Category Header */}
       <div className="text-center space-y-6 py-8">
         <div className="flex justify-center">
@@ -129,8 +248,18 @@ export default function CategoryPage({ params }: CategoryPageProps) {
         </div>
       </div>
 
-      {/* Category Navigation */}
-      <CategoryNav currentCategory={slug} />
+      {/* Category Sub-Navigation */}
+      {(slug.startsWith('nederland-') || slug.startsWith('europa-') || slug.startsWith('wereld-')) && (
+        <CategorySubNav 
+          mainCategory={
+            slug.startsWith('nederland') ? 'nederland' : 
+            slug.startsWith('europa') ? 'europa' : 
+            slug.startsWith('wereld') ? 'wereld' : 
+            slug
+          } 
+          currentSlug={slug} 
+        />
+      )}
 
       {/* Featured Article */}
       {articles.length > 0 && (
@@ -243,9 +372,39 @@ export default function CategoryPage({ params }: CategoryPageProps) {
   )
 }
 
-// Generate static params for known categories
+// Generate static params for all categories
 export function generateStaticParams() {
   return Object.keys(categoryMap).map((slug) => ({
     slug,
   }))
+}
+
+// Add dynamic metadata for SEO
+export async function generateMetadata({ params }: CategoryPageProps) {
+  const { slug } = params
+  const categoryName = categoryMap[slug]
+  
+  if (!categoryName) {
+    return {
+      title: 'Categorie niet gevonden - Nonbulla',
+      description: 'De gevraagde nieuwscategorie kon niet worden gevonden.'
+    }
+  }
+
+  const description = categoryDescriptions[slug] || `Lees het laatste nieuws over ${categoryName}`
+  
+  return {
+    title: `${categoryName} - Nonbulla`,
+    description: description,
+    openGraph: {
+      title: `${categoryName} - Nonbulla`,
+      description: description,
+      type: 'website',
+    },
+    twitter: {
+      card: 'summary',
+      title: `${categoryName} - Nonbulla`,
+      description: description,
+    }
+  }
 }

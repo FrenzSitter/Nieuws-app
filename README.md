@@ -1,4 +1,4 @@
-# Nonbulla – Nieuws buiten je bubbel 🌐
+# Nonbulla – Ontdek het nieuws buiten je bubbel 🌐
 
 Doorbreek je nieuwsbubbel met multi-perspectief AI-analyse. Nonbulla toont verhalen vanuit verschillende invalshoeken, zodat je een completer beeld krijgt van de werkelijkheid. Gebouwd met Next.js 14 en Supabase.
 
@@ -159,7 +159,7 @@ Dit project is licensed onder de MIT License - zie het [LICENSE](LICENSE) bestan
 
 ---
 
-**Nonbulla** - *Nieuws buiten je bubbel* 🌐✨
+**Nonbulla** - *Ontdek het nieuws buiten je bubbel* 🌐✨
 
 ## 🎯 Brand Identity
 

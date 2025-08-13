@@ -170,6 +170,107 @@ CREATE TABLE related_clusters (
 );
 
 -- =====================================================
+-- 7. STORY CLUSTERS TABLE
+-- =====================================================
+CREATE TABLE story_clusters (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    primary_topic VARCHAR(500) NOT NULL,
+    keywords TEXT[] NOT NULL,
+    detection_timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    sources_found TEXT[] DEFAULT '{}',
+    sources_missing TEXT[] DEFAULT '{}',
+    processing_status VARCHAR(20) DEFAULT 'detecting' CHECK (processing_status IN ('detecting', 'analyzing', 'complete', 'failed')),
+    unified_article_id UUID,
+    recheck_scheduled_at TIMESTAMPTZ,
+    trigger_source VARCHAR(100), -- Which source triggered this cluster
+    similarity_threshold DECIMAL(3,2) DEFAULT 0.80,
+    article_count INTEGER DEFAULT 0,
+    metadata JSONB DEFAULT '{}',
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- =====================================================
+-- 8. UNIFIED ARTICLES TABLE  
+-- =====================================================
+CREATE TABLE unified_articles (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    cluster_id UUID NOT NULL REFERENCES story_clusters(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    unified_content TEXT NOT NULL,
+    perspective_analysis JSONB DEFAULT '{}', -- Per-source analysis
+    source_chips JSONB[] DEFAULT '{}', -- Clickable source references
+    surprise_ending TEXT, -- "Om-denken" afsluiting
+    notebooklm_summary TEXT, -- Extended summary for podcast
+    ai_model_used VARCHAR(50) DEFAULT 'gpt-4',
+    generation_timestamp TIMESTAMPTZ DEFAULT NOW(),
+    published_at TIMESTAMPTZ,
+    view_count INTEGER DEFAULT 0,
+    engagement_score INTEGER DEFAULT 0,
+    status VARCHAR(20) DEFAULT 'draft' CHECK (status IN ('draft', 'review', 'published', 'archived')),
+    metadata JSONB DEFAULT '{}',
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- =====================================================
+-- 9. SOURCE PERSPECTIVES TABLE
+-- =====================================================
+CREATE TABLE source_perspectives (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    cluster_id UUID NOT NULL REFERENCES story_clusters(id) ON DELETE CASCADE,
+    article_id UUID NOT NULL REFERENCES raw_articles(id) ON DELETE CASCADE,
+    source_name VARCHAR(100) NOT NULL,
+    original_article_url TEXT NOT NULL,
+    original_title TEXT NOT NULL,
+    key_angle TEXT,
+    unique_details TEXT[] DEFAULT '{}',
+    sentiment_score DECIMAL(3,2), -- -1.0 to 1.0
+    political_leaning_detected VARCHAR(20),
+    credibility_assessment INTEGER CHECK (credibility_assessment >= 0 AND credibility_assessment <= 100),
+    perspective_summary TEXT,
+    quote_extracts TEXT[] DEFAULT '{}',
+    analysis_timestamp TIMESTAMPTZ DEFAULT NOW(),
+    metadata JSONB DEFAULT '{}',
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- =====================================================
+-- 10. CONTENT WORKFLOWS TABLE
+-- =====================================================
+CREATE TABLE content_workflows (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    cluster_id UUID REFERENCES story_clusters(id) ON DELETE CASCADE,
+    unified_article_id UUID REFERENCES unified_articles(id) ON DELETE CASCADE,
+    workflow_status VARCHAR(20) DEFAULT 'draft' CHECK (workflow_status IN ('draft', 'review', 'approved', 'published', 'rejected', 'archived')),
+    ai_confidence_score DECIMAL(3,2) CHECK (ai_confidence_score >= 0 AND ai_confidence_score <= 1),
+    editorial_priority INTEGER DEFAULT 5 CHECK (editorial_priority >= 1 AND editorial_priority <= 10),
+    auto_publish_eligible BOOLEAN DEFAULT false,
+    scheduled_publish_at TIMESTAMPTZ,
+    workflow_metadata JSONB DEFAULT '{}',
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- =====================================================
+-- 11. EDITORIAL REVIEWS TABLE
+-- =====================================================
+CREATE TABLE editorial_reviews (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    workflow_id UUID NOT NULL REFERENCES content_workflows(id) ON DELETE CASCADE,
+    reviewer_id VARCHAR(100), -- User/editor identifier
+    review_action VARCHAR(20) NOT NULL CHECK (review_action IN ('approve', 'reject', 'edit', 'flag', 'request_changes')),
+    feedback TEXT,
+    changes_requested TEXT,
+    priority_adjustment INTEGER, -- Change in priority
+    auto_publish_decision BOOLEAN,
+    review_metadata JSONB DEFAULT '{}',
+    reviewed_at TIMESTAMPTZ DEFAULT NOW(),
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- =====================================================
 -- INDEXES FOR PERFORMANCE OPTIMIZATION
 -- =====================================================
 
@@ -695,10 +796,40 @@ $$ language 'plpgsql';
 -- =====================================================
 
 -- Insert sample news sources
-INSERT INTO news_sources (name, url, rss_feed_url, category, country_code, credibility_score, political_leaning) VALUES
-('NOS Nieuws', 'https://nos.nl', 'https://feeds.nos.nl/nosnieuwsalgemeen', 'algemeen', 'NL', 85, 'center'),
-('NU.nl', 'https://nu.nl', 'https://www.nu.nl/rss/Algemeen', 'algemeen', 'NL', 80, 'center'),
-('De Volkskrant', 'https://volkskrant.nl', 'https://www.volkskrant.nl/nieuws/rss.xml', 'kwaliteit', 'NL', 90, 'center-left'),
-('Telegraaf', 'https://telegraaf.nl', 'https://www.telegraaf.nl/rss', 'populair', 'NL', 75, 'center-right'),
-('RTL Nieuws', 'https://rtlnieuws.nl', 'https://www.rtlnieuws.nl/service/rss', 'algemeen', 'NL', 82, 'center')
+-- Enhanced nieuwsbronnen met tiers
+INSERT INTO news_sources (name, url, rss_feed_url, category, country_code, credibility_score, political_leaning, metadata) VALUES
+-- Primary Dutch Sources
+('NU.nl Algemeen', 'https://nu.nl', 'https://www.nu.nl/rss/Algemeen', 'algemeen', 'NL', 80, 'center', '{"tier": "primary", "priority_weight": 10, "cross_reference_required": true}'),
+('De Telegraaf RSS', 'https://telegraaf.nl', 'https://www.telegraaf.nl/rss/', 'algemeen', 'NL', 75, 'center-right', '{"tier": "primary", "priority_weight": 9, "cross_reference_required": true}'),
+('De Telegraaf Binnenland', 'https://telegraaf.nl', 'https://www.telegraaf.nl/binnenland/', 'binnenland', 'NL', 75, 'center-right', '{"tier": "primary", "priority_weight": 8, "cross_reference_required": true}'),
+('De Telegraaf Buitenland', 'https://telegraaf.nl', 'https://www.telegraaf.nl/buitenland/', 'buitenland', 'NL', 75, 'center-right', '{"tier": "primary", "priority_weight": 8, "cross_reference_required": true}'),
+('De Volkskrant Voorpagina', 'https://volkskrant.nl', 'https://www.volkskrant.nl/voorpagina/rss.xml', 'kwaliteit', 'NL', 90, 'center-left', '{"tier": "primary", "priority_weight": 9, "cross_reference_required": true}'),
+('De Volkskrant Achtergrond', 'https://volkskrant.nl', 'https://www.volkskrant.nl/nieuws-achtergrond/rss.xml', 'achtergrond', 'NL', 90, 'center-left', '{"tier": "primary", "priority_weight": 8, "cross_reference_required": true}'),
+('NOS Journaal', 'https://nos.nl', 'http://feeds.nos.nl/nosjournaal', 'algemeen', 'NL', 85, 'center', '{"tier": "primary", "priority_weight": 10, "cross_reference_required": true}'),
+('NOS Nieuwsuur', 'https://nos.nl', 'http://feeds.nos.nl/nieuwsuuralgemeen', 'achtergrond', 'NL', 85, 'center', '{"tier": "primary", "priority_weight": 8, "cross_reference_required": true}'),
+
+-- Secondary Dutch Sources
+('NRC', 'https://nrc.nl', 'http://feeds.feedburner.com/nrc/FmXV', 'kwaliteit', 'NL', 88, 'center-left', '{"tier": "secondary", "priority_weight": 7, "cross_reference_required": false}'),
+('AD Algemeen', 'https://ad.nl', 'https://www.ad.nl/home/rss.xml', 'populair', 'NL', 70, 'center', '{"tier": "secondary", "priority_weight": 6, "cross_reference_required": false}'),
+('Trouw', 'https://trouw.nl', 'http://www.trouw.nl/rss/laatstenieuws/laatstenieuws/', 'kwaliteit', 'NL', 82, 'center-left', '{"tier": "secondary", "priority_weight": 6, "cross_reference_required": false}'),
+('RTL Nieuws', 'https://rtl.nl', 'http://www.rtl.nl/service/rss/rtlnieuws/index.xml', 'algemeen', 'NL', 78, 'center', '{"tier": "secondary", "priority_weight": 6, "cross_reference_required": false}'),
+
+-- Specialty Dutch Sources  
+('Financieele Dagblad', 'https://fd.nl', 'http://fd.nl/?widget=rssfeed&view=feed&contentId=33810', 'economie', 'NL', 85, 'center', '{"tier": "specialty", "priority_weight": 5, "cross_reference_required": false}'),
+('Reformatorisch Dagblad', 'https://refdag.nl', 'http://www.refdag.nl/rss/laatste+nieuws.rss', 'religieus', 'NL', 60, 'right', '{"tier": "specialty", "priority_weight": 4, "cross_reference_required": false}'),
+('Elsevier Weekblad', 'https://elsevierweekblad.nl', 'https://www.elsevierweekblad.nl/feed/', 'opinie', 'NL', 72, 'center-right', '{"tier": "specialty", "priority_weight": 4, "cross_reference_required": false}'),
+('Nederlands Dagblad', 'https://nd.nl', 'http://www.nd.nl/rss/nieuws', 'religieus', 'NL', 65, 'center-right', '{"tier": "specialty", "priority_weight": 4, "cross_reference_required": false}'),
+('Nieuws.nl', 'https://nieuws.nl', 'https://nieuws.nl/feed/', 'algemeen', 'NL', 60, 'center', '{"tier": "specialty", "priority_weight": 3, "cross_reference_required": false}'),
+('Maghreb Magazine', 'https://maghrebmagazine.nl', 'http://www.maghrebmagazine.nl/feed/', 'multicultureel', 'NL', 55, 'center-left', '{"tier": "specialty", "priority_weight": 3, "cross_reference_required": false}'),
+('NOS 60 Seconden', 'https://nos.nl', 'http://feeds.nos.nl/nos-nieuwsin60seconden', 'kort', 'NL', 85, 'center', '{"tier": "specialty", "priority_weight": 3, "cross_reference_required": false}'),
+('Rijksoverheid', 'https://rijksoverheid.nl', 'https://www.rijksoverheid.nl/rss', 'overheid', 'NL', 95, 'center', '{"tier": "specialty", "priority_weight": 7, "cross_reference_required": false}'),
+
+-- International Sources
+('New York Times', 'https://nytimes.com', 'https://www.nytimes.com/rss', 'internationaal', 'US', 85, 'center-left', '{"tier": "international", "priority_weight": 5, "cross_reference_required": false}'),
+('Vox', 'https://vox.com', 'https://www.vox.com/rss/index.xml', 'internationaal', 'US', 75, 'center-left', '{"tier": "international", "priority_weight": 4, "cross_reference_required": false}'),
+('Vox Politics', 'https://vox.com', 'https://www.vox.com/rss/politics/index.xml', 'politiek', 'US', 75, 'center-left', '{"tier": "international", "priority_weight": 4, "cross_reference_required": false}'),
+('BBC World', 'https://bbc.co.uk', 'https://feeds.bbci.co.uk/news/world/rss.xml', 'internationaal', 'UK', 88, 'center', '{"tier": "international", "priority_weight": 6, "cross_reference_required": false}'),
+('NBC News', 'https://nbcnews.com', 'https://feeds.nbcnews.com/nbcnews/public/news', 'internationaal', 'US', 78, 'center', '{"tier": "international", "priority_weight": 4, "cross_reference_required": false}'),
+('CNBC', 'https://cnbc.com', 'https://www.cnbc.com/id/100727362/device/rss/rss.html', 'economie', 'US', 80, 'center', '{"tier": "international", "priority_weight": 4, "cross_reference_required": false}')
+
 ON CONFLICT (rss_feed_url) DO NOTHING;

@@ -1,5 +1,23 @@
 {
   "framework": "nextjs",
+  "crons": [
+    {
+      "path": "/api/rss/cron",
+      "schedule": "0 */2 * * *"
+    },
+    {
+      "path": "/api/crawler/enhanced",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cross-reference/analyze?action=process_delayed",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/ai/generate-article?action=batch_generate",
+      "schedule": "30 * * * *"
+    }
+  ],
   "headers": [
     {
       "source": "/api/(.*)",

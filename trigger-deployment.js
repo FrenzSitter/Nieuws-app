@@ -42,7 +42,7 @@ envVars.forEach((envVar, index) => {
 
 console.log('\n✨ Na het toevoegen van environment variables:');
 console.log('- https://nieuws-app.vercel.app zou moeten laden (met Nonbulla branding)');
-console.log('- Homepage met "Nonbulla – Nieuws buiten je bubbel" zou zichtbaar moeten zijn');
+console.log('- Homepage met "Nonbulla – Ontdek het nieuws buiten je bubbel" zou zichtbaar moeten zijn');
 console.log('- Database connectie zou moeten werken');
 
 process.exit(0);
