@@ -6,24 +6,52 @@ export default function Home() {
   const [articles, setArticles] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string>('')
+  const [isUnifiedContent, setIsUnifiedContent] = useState(false)
 
   useEffect(() => {
-    console.log('🚀 Starting to fetch REAL articles...')
+    console.log('🚀 Starting to fetch articles - trying unified first, then raw...')
     
-    fetch('/api/articles/recent?limit=10&t=' + Date.now())
+    // Try unified articles first (AI-generated content)
+    fetch('/api/ai/generate-article?action=recent&limit=10&t=' + Date.now())
+      .then(response => response.json())
+      .then(data => {
+        console.log('🧠 AI Unified Articles Response:', data)
+        
+        if (data.success && data.data?.articles && data.data.articles.length > 0) {
+          console.log('✅ SUCCESS! Got', data.data.articles.length, 'unified AI articles')
+          console.log('🎯 First unified article:', data.data.articles[0]?.title)
+          setArticles(data.data.articles.map((article: any) => ({
+            ...article,
+            source: { name: `${article.sources_count} bronnen`, credibilityScore: 90, politicalLeaning: 'balanced' },
+            publishedAt: article.generated_at,
+            description: `Samenvatting van ${article.sources_count} nieuwsbronnen`,
+            isUnified: true
+          })))
+          setIsUnifiedContent(true)
+          setLoading(false)
+        } else {
+          console.log('⚠️ No unified articles available, falling back to raw articles...')
+          
+          // Fallback to raw articles
+          return fetch('/api/articles/recent?limit=10&t=' + Date.now())
+        }
+      })
       .then(response => {
-        console.log('📡 API Response status:', response.status)
+        if (!response) return null
+        console.log('📡 Raw Articles Response status:', response.status)
         return response.json()
       })
       .then(data => {
-        console.log('📋 API Response:', data)
+        if (!data) return
+        console.log('📋 Raw Articles Response:', data)
         
         if (data.success && data.data) {
-          console.log('✅ SUCCESS! Got', data.data.length, 'real articles')
-          console.log('🎯 First article:', data.data[0]?.title)
+          console.log('✅ FALLBACK SUCCESS! Got', data.data.length, 'raw articles')
+          console.log('🎯 First raw article:', data.data[0]?.title)
           setArticles(data.data)
+          setIsUnifiedContent(false)
         } else {
-          console.error('❌ API Error:', data)
+          console.error('❌ Both APIs failed:', data)
           setError(JSON.stringify(data))
         }
         setLoading(false)
@@ -83,11 +111,18 @@ export default function Home() {
       <div className="max-w-6xl mx-auto">
         
         {/* SUCCESS HEADER */}
-        <div className="bg-green-600 text-white p-6 rounded-lg mb-8 text-center">
-          <h1 className="text-4xl font-bold mb-2">🎉 SUCCES!</h1>
-          <h2 className="text-2xl">Nonbulla toont nu ECHTE Nederlandse nieuws!</h2>
-          <p className="mt-2 text-green-100">
-            {articles.length} artikelen geladen van RSS feeds • Bijgewerkt: {new Date().toLocaleString('nl-NL')}
+        <div className={`${isUnifiedContent ? 'bg-purple-600' : 'bg-green-600'} text-white p-6 rounded-lg mb-8 text-center`}>
+          <h1 className="text-4xl font-bold mb-2">
+            {isUnifiedContent ? '🧠 AI SYNTHESIS!' : '🎉 RAW CONTENT!'}
+          </h1>
+          <h2 className="text-2xl">
+            {isUnifiedContent 
+              ? 'Nonbulla toont nu AI-gegenereerde nieuwssyntheses!' 
+              : 'Nonbulla toont nu ECHTE Nederlandse nieuws!'
+            }
+          </h2>
+          <p className={`mt-2 ${isUnifiedContent ? 'text-purple-100' : 'text-green-100'}`}>
+            {articles.length} {isUnifiedContent ? 'AI artikelen' : 'RSS artikelen'} geladen • Bijgewerkt: {new Date().toLocaleString('nl-NL')}
           </p>
         </div>
 
