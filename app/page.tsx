@@ -5,10 +5,6 @@ import HeroArticle from '@/components/HeroArticle'
 import NewsCard from '@/components/NewsCard'
 import MultiPerspectiveCard from '@/components/MultiPerspectiveCard'
 import { rssManager } from '@/lib/rss-parser'
-import {
-  heroArticles,
-  multiPerspectiveArticles
-} from '@/lib/sampleNews'
 
 export default async function Home() {
   const supabase = createClient()
@@ -61,7 +57,7 @@ export default async function Home() {
       <CategoryNav />
 
       {/* Hero Section */}
-      {heroArticles.length > 0 && (
+      {latestNews.length > 0 && (
         <div className="space-y-6">
           <div className="flex items-center justify-between">
             <h2 className="text-2xl font-display font-bold text-gray-900 dark:text-gray-100">
@@ -73,7 +69,7 @@ export default async function Home() {
             </div>
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {heroArticles.slice(0, 2).map((article) => (
+            {latestNews.slice(0, 2).map((article) => (
               <HeroArticle
                 key={article.id}
                 id={article.id}
@@ -92,8 +88,8 @@ export default async function Home() {
         </div>
       )}
 
-      {/* Multi-Perspective Articles */}
-      {multiPerspectiveArticles.length > 0 && (
+      {/* Multi-Perspective Articles - Coming Soon */}
+      {false && (
         <div className="space-y-6">
           <div className="text-center space-y-2">
             <h2 className="text-2xl font-display font-bold text-gray-900 dark:text-gray-100">
@@ -103,18 +99,10 @@ export default async function Home() {
               Dezelfde verhalen, verschillende invalshoeken - krijg het complete beeld
             </p>
           </div>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {multiPerspectiveArticles.map((article) => (
-              <MultiPerspectiveCard
-                key={article.id}
-                id={article.id}
-                title={article.title}
-                topic={article.topic}
-                perspectives={article.perspectives}
-                publishedAt={article.publishedAt}
-                totalSources={article.totalSources}
-              />
-            ))}
+          <div className="text-center py-8">
+            <p className="text-gray-500 dark:text-gray-400">
+              AI multi-perspective analyse wordt binnenkort geactiveerd...
+            </p>
           </div>
         </div>
       )}
