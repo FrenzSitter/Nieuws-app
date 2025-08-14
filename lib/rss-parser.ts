@@ -173,56 +173,38 @@ class RSSFeedManager {
       errors: [] as string[]
     }
 
-    console.log(`Starting RSS fetch for ${sources.length} active sources`)
+    console.log(`Starting parallel RSS fetch for ${sources.length} active sources`)
 
-    for (const source of sources) {
-      try {
-        console.log(`Processing source: ${source.name} (${source.rss_feed_url})`)
-        
-        const items = await this.parseRSSFeed(source.rss_feed_url)
-        
-        if (items.length === 0) {
-          results.errors.push(`No articles found for ${source.name}`)
-          continue
-        }
+    // Process sources in parallel batches to respect rate limits
+    const batchSize = 5 // Process 5 sources concurrently
+    const batches = []
+    
+    for (let i = 0; i < sources.length; i += batchSize) {
+      batches.push(sources.slice(i, i + batchSize))
+    }
 
-        const saveResult = await this.saveArticlesToDatabase(items, source.id)
-        
-        if (saveResult.success) {
-          results.totalArticles += saveResult.count || 0
+    for (const batch of batches) {
+      const batchPromises = batch.map(source => this.processSingleSource(source))
+      const batchResults = await Promise.allSettled(batchPromises)
+
+      batchResults.forEach((result, index) => {
+        const source = batch[index]
+        if (result.status === 'fulfilled') {
+          results.totalArticles += result.value.articleCount
           results.successfulSources += 1
-          
-          // Update last_fetched_at for successful sources
-          await this.supabase
-            .from('news_sources')
-            .update({ 
-              last_fetched_at: new Date().toISOString(),
-              fetch_error_count: 0
-            })
-            .eq('id', source.id)
         } else {
-          results.errors.push(`Failed to save articles for ${source.name}: ${saveResult.error}`)
-          
-          // Increment error count
-          await this.supabase
-            .from('news_sources')
-            .update({
-              fetch_error_count: (source.fetch_error_count || 0) + 1
-            })
-            .eq('id', source.id)
+          results.errors.push(`Error processing ${source.name}: ${result.reason}`)
         }
+      })
 
-        // Add delay between requests to be respectful
-        await new Promise(resolve => setTimeout(resolve, 1000))
-
-      } catch (error) {
-        console.error(`Error processing source ${source.name}:`, error)
-        results.errors.push(`Error processing ${source.name}: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      // Small delay between batches
+      if (batches.indexOf(batch) < batches.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 2000))
       }
     }
 
     const executionTime = Date.now() - startTime
-    console.log('RSS fetch completed:', results)
+    console.log('Parallel RSS fetch completed:', results)
     
     // Log the results to database for monitoring
     try {
@@ -241,6 +223,46 @@ class RSSFeedManager {
     }
     
     return results
+  }
+
+  private async processSingleSource(source: NewsSource): Promise<{ articleCount: number }> {
+    try {
+      console.log(`Processing source: ${source.name} (${source.rss_feed_url})`)
+      
+      const items = await this.parseRSSFeed(source.rss_feed_url)
+      
+      if (items.length === 0) {
+        throw new Error(`No articles found for ${source.name}`)
+      }
+
+      const saveResult = await this.saveArticlesToDatabase(items, source.id)
+      
+      if (saveResult.success) {
+        // Update last_fetched_at for successful sources
+        await this.supabase
+          .from('news_sources')
+          .update({ 
+            last_fetched_at: new Date().toISOString(),
+            fetch_error_count: 0
+          })
+          .eq('id', source.id)
+        
+        return { articleCount: saveResult.count || 0 }
+      } else {
+        throw new Error(`Failed to save articles: ${saveResult.error}`)
+      }
+
+    } catch (error) {
+      // Increment error count
+      await this.supabase
+        .from('news_sources')
+        .update({
+          fetch_error_count: (source.fetch_error_count || 0) + 1
+        })
+        .eq('id', source.id)
+      
+      throw error
+    }
   }
 
   async getRecentArticles(limit: number = 50): Promise<any[]> {

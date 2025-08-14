@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 
@@ -15,7 +16,7 @@ interface NewsCardProps {
   perspectiveCount?: number
 }
 
-export default function NewsCard({ 
+const NewsCard = memo(function NewsCard({ 
   id,
   title, 
   summary, 
@@ -54,6 +55,9 @@ export default function NewsCard({
               alt={title}
               fill
               className="object-cover group-hover:scale-105 transition-transform duration-300"
+              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+              quality={75}
+              priority={false}
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
             
@@ -138,4 +142,6 @@ export default function NewsCard({
       </article>
     </Link>
   )
-}
+})
+
+export default NewsCard
