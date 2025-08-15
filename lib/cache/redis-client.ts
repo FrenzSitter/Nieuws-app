@@ -179,7 +179,31 @@ export async function isRedisHealthy(): Promise<boolean> {
 
 // Cache manager object voor eenvoudige imports
 export const cacheManager = {
-  get: getCached,
+  // Wrapper voor getCached met optionele fallback
+  get: async <T>(key: string, fallback?: () => Promise<T>, ttl?: number): Promise<T | null> => {
+    if (!fallback) {
+      // Als geen fallback, probeer alleen cache te lezen
+      if (!redis) return null
+      try {
+        const cached = await redis.get(key)
+        return cached as T || null
+      } catch {
+        return null
+      }
+    }
+    return getCached(key, fallback, ttl)
+  },
+  
+  // Direct cache functies
+  set: async (key: string, value: any, ttl?: number) => {
+    if (!redis) return
+    try {
+      await redis.set(key, JSON.stringify(value), { ex: ttl || CACHE_TTL.ARTICLES_LIST })
+    } catch (error) {
+      console.error(`Cache set failed for ${key}:`, error)
+    }
+  },
+  
   invalidate: invalidateCache,
   getBatch: getCachedBatch,
   isHealthy: isRedisHealthy,
