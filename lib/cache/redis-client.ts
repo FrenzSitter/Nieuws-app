@@ -177,4 +177,15 @@ export async function isRedisHealthy(): Promise<boolean> {
   }
 }
 
+// Cache manager object voor eenvoudige imports
+export const cacheManager = {
+  get: getCached,
+  invalidate: invalidateCache,
+  getBatch: getCachedBatch,
+  isHealthy: isRedisHealthy,
+  keys: CACHE_KEYS,
+  ttl: CACHE_TTL,
+  redis
+}
+
 export { redis }
