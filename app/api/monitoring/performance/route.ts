@@ -127,9 +127,9 @@ async function getRSSPerformanceMetrics(supabase: any, startTime: Date) {
     .gte('created_at', startTime.toISOString())
 
   const totalFetches = fetchLogs?.length || 0
-  const successfulFetches = fetchLogs?.filter(log => log.status === 'completed').length || 0
-  const totalArticles = fetchLogs?.reduce((sum, log) => sum + (log.total_articles || 0), 0) || 0
-  const avgExecutionTime = fetchLogs?.reduce((sum, log) => sum + (log.execution_time_ms || 0), 0) / totalFetches || 0
+  const successfulFetches = fetchLogs?.filter((log: any) => log.status === 'completed').length || 0
+  const totalArticles = fetchLogs?.reduce((sum, log: any) => sum + (log.total_articles || 0), 0) || 0
+const avgExecutionTime = fetchLogs?.reduce((sum, log: any) => sum + (log.execution_time_ms || 0), 0) / totalFetches || 0
 
   // Source reliability metrics
   const sourcePerformance = sourceLogs?.reduce((acc, log) => {
