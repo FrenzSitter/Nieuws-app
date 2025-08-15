@@ -1,12 +1,15 @@
 import { createClient } from './supabase/client'
 import Parser from 'rss-parser'
 
+// Nonbulla Categories
+type NonbullaCategory = 'Alles' | 'Politiek' | 'Economie' | 'Oorlog' | 'Wetenschap' | 'Technologie' | 'Feiten'
+
 export interface EnhancedNewsSource {
   id: string
   name: string
   url: string
   rss_feed_url: string
-  category?: string
+  category?: NonbullaCategory
   country_code: string
   language_code: string
   credibility_score: number
@@ -22,27 +25,42 @@ export interface RSSArticle {
   source_id: string
   title: string
   description?: string
-  content?: string
+  // Focus on metadata, not full content extraction
   url: string
   author?: string
   published_at: string
   guid?: string
   categories?: string[]
-  raw_content: any
+  // Metadata for clustering and cross-referencing
+  keywords: string[]
+  topic_category: NonbullaCategory
+  quality_score: number
+  sentiment_score?: number
+  language_detected?: string
+  raw_metadata: any
 }
 
 export interface StoryCluster {
   id: string
-  primary_topic: string
+  title: string
   keywords: string[]
-  detection_timestamp: string
-  sources_found: string[]
-  sources_missing: string[]
-  processing_status: 'detecting' | 'analyzing' | 'complete' | 'failed'
-  trigger_source: string
-  similarity_threshold: number
+  main_topic: string
+  time_period_start: string
+  time_period_end: string
+  status: 'detecting' | 'analyzing' | 'ready_for_ai' | 'synthesized' | 'failed'
+  cluster_method: 'metadata_similarity' | 'keyword_matching' | 'ai_enhanced'
+  confidence_score: number
   article_count: number
-  articles: RSSArticle[]
+  nonbulla_category: NonbullaCategory
+  geographic_focus?: string
+  trending_score?: number
+  metadata: {
+    trigger_source: string
+    sources_found: string[]
+    sources_missing: string[]
+    similarity_threshold: number
+    last_updated: string
+  }
 }
 
 class EnhancedRSSCrawler {
@@ -97,11 +115,12 @@ class EnhancedRSSCrawler {
   }
 
   /**
-   * Enhanced RSS parsing with better content extraction
+   * Enhanced RSS parsing focused on metadata collection for clustering
+   * NO full text extraction - only metadata for efficient processing
    */
   async parseEnhancedRSS(source: EnhancedNewsSource): Promise<RSSArticle[]> {
     try {
-      console.log(`📡 Fetching RSS from ${source.name}: ${source.rss_feed_url}`)
+      console.log(`📡 Fetching RSS metadata from ${source.name}: ${source.rss_feed_url}`)
       
       const feed = await this.parser.parseURL(source.rss_feed_url)
       
@@ -110,19 +129,34 @@ class EnhancedRSSCrawler {
         return []
       }
 
-      const articles: RSSArticle[] = feed.items.map((item: any) => ({
-        id: `${source.id}_${item.guid || item.id || item.link}`,
-        source_id: source.id,
-        title: this.cleanTitle(item.title || 'Untitled'),
-        description: this.cleanContent(item.summary || item.contentSnippet || ''),
-        content: this.extractContent(item),
-        url: item.link || '',
-        author: item.creator || item.dc?.creator || item.author,
-        published_at: new Date(item.pubDate || item.isoDate || new Date()).toISOString(),
-        guid: item.guid || item.id || item.link,
-        categories: this.extractCategories(item.categories),
-        raw_content: item
-      }))
+      const articles: RSSArticle[] = feed.items.map((item: any) => {
+        const title = this.cleanTitle(item.title || 'Untitled')
+        const description = this.cleanContent(item.summary || item.contentSnippet || '')
+        const keywords = this.extractKeywords(title + ' ' + description)
+        const topicCategory = this.categorizeArticle(title, description, source.category)
+        
+        return {
+          id: `${source.id}_${item.guid || item.id || item.link}`,
+          source_id: source.id,
+          title,
+          description,
+          url: item.link || '',
+          author: item.creator || item.dc?.creator || item.author,
+          published_at: new Date(item.pubDate || item.isoDate || new Date()).toISOString(),
+          guid: item.guid || item.id || item.link,
+          categories: this.extractCategories(item.categories),
+          keywords,
+          topic_category: topicCategory,
+          quality_score: this.calculateInitialQualityScore(item, source),
+          sentiment_score: this.detectSentiment(title + ' ' + description),
+          language_detected: 'nl', // Assume Dutch for now
+          raw_metadata: {
+            feed_category: item.category,
+            tags: item.categories,
+            source_priority: source.priority_weight
+          }
+        }
+      })
 
       // Filter out articles older than 48 hours for real-time processing
       const cutoffTime = new Date(Date.now() - 48 * 60 * 60 * 1000)
@@ -130,7 +164,7 @@ class EnhancedRSSCrawler {
         new Date(article.published_at) > cutoffTime
       )
 
-      console.log(`✅ Parsed ${recentArticles.length}/${articles.length} recent articles from ${source.name}`)
+      console.log(`✅ Parsed ${recentArticles.length}/${articles.length} recent article metadata from ${source.name}`)
       return recentArticles
 
     } catch (error) {
@@ -216,10 +250,11 @@ class EnhancedRSSCrawler {
   }
 
   /**
-   * Initial story clustering based on title and keyword similarity
+   * Enhanced story clustering focused on metadata-based similarity and cross-referencing
+   * Uses the new database schema (topic_clusters table)
    */
   async performInitialClustering(articles: RSSArticle[]): Promise<StoryCluster[]> {
-    console.log('🧠 Performing intelligent story clustering...')
+    console.log('🧠 Performing intelligent metadata-based story clustering...')
     
     const clusters: StoryCluster[] = []
     const processedArticles = new Set<string>()
@@ -227,22 +262,31 @@ class EnhancedRSSCrawler {
     for (const article of articles) {
       if (processedArticles.has(article.id)) continue
 
-      const keywords = this.extractKeywords(article.title + ' ' + (article.description || ''))
-      const similarArticles = this.findSimilarArticles(article, articles, keywords)
+      const similarArticles = this.findSimilarArticlesByMetadata(article, articles)
 
-      if (similarArticles.length >= 1) { // At least the article itself
+      if (similarArticles.length >= 2) { // Need at least 2 articles for a cluster
+        const now = new Date().toISOString()
         const cluster: StoryCluster = {
           id: `cluster_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-          primary_topic: this.generatePrimaryTopic(similarArticles),
-          keywords: keywords,
-          detection_timestamp: new Date().toISOString(),
-          sources_found: Array.from(new Set(similarArticles.map(a => a.source_id))),
-          sources_missing: [],
-          processing_status: 'detecting',
-          trigger_source: article.source_id,
-          similarity_threshold: 0.80,
+          title: this.generateClusterTitle(similarArticles),
+          keywords: this.mergeKeywords(similarArticles),
+          main_topic: this.generateMainTopic(similarArticles),
+          time_period_start: this.getEarliestTimestamp(similarArticles),
+          time_period_end: this.getLatestTimestamp(similarArticles),
+          status: 'detecting',
+          cluster_method: 'metadata_similarity',
+          confidence_score: this.calculateClusterConfidence(similarArticles),
           article_count: similarArticles.length,
-          articles: similarArticles
+          nonbulla_category: this.determineClusterCategory(similarArticles),
+          geographic_focus: this.detectGeographicFocus(similarArticles),
+          trending_score: this.calculateTrendingScore(similarArticles),
+          metadata: {
+            trigger_source: article.source_id,
+            sources_found: Array.from(new Set(similarArticles.map(a => a.source_id))),
+            sources_missing: [],
+            similarity_threshold: 0.75,
+            last_updated: now
+          }
         }
 
         clusters.push(cluster)
@@ -250,11 +294,12 @@ class EnhancedRSSCrawler {
         // Mark articles as processed
         similarArticles.forEach(a => processedArticles.add(a.id))
 
-        // Store cluster in database
-        await this.storeStoryCluster(cluster)
+        // Store cluster in new database schema
+        await this.storeTopicCluster(cluster, similarArticles)
       }
     }
 
+    console.log(`✅ Created ${clusters.length} topic clusters from ${articles.length} articles`)
     return clusters
   }
 
@@ -306,7 +351,8 @@ class EnhancedRSSCrawler {
   }
 
   /**
-   * Store articles in database with enhanced metadata
+   * Store articles with enhanced metadata for clustering and AI processing
+   * Uses the updated database schema focusing on metadata
    */
   private async storeArticles(articles: RSSArticle[], source: EnhancedNewsSource) {
     if (articles.length === 0) return
@@ -315,18 +361,24 @@ class EnhancedRSSCrawler {
       source_id: source.id,
       title: article.title,
       description: article.description,
-      content: article.content,
+      // No full content - just URL for later retrieval if needed by AI
       url: article.url,
       author: article.author,
       published_at: article.published_at,
       guid: article.guid,
       categories: article.categories,
-      processing_status: 'pending',
-      quality_score: this.calculateQualityScore(article, source),
+      processing_status: 'pending_clustering',
+      quality_score: article.quality_score,
+      sentiment_score: article.sentiment_score,
+      language_detected: article.language_detected,
+      tags: article.keywords, // Store keywords as tags
       metadata: {
         source_tier: source.tier,
         crawl_timestamp: new Date().toISOString(),
-        priority_weight: source.priority_weight
+        priority_weight: source.priority_weight,
+        topic_category: article.topic_category,
+        clustering_keywords: article.keywords,
+        raw_feed_data: article.raw_metadata
       }
     }))
 
@@ -340,49 +392,72 @@ class EnhancedRSSCrawler {
         .select()
 
       if (error) {
-        console.error(`Error storing articles for ${source.name}:`, error)
+        console.error(`Error storing article metadata for ${source.name}:`, error)
       } else {
-        console.log(`💾 Stored ${data?.length || 0} articles from ${source.name}`)
+        console.log(`💾 Stored ${data?.length || 0} article metadata records from ${source.name}`)
       }
     } catch (error) {
-      console.error(`Failed to store articles for ${source.name}:`, error)
+      console.error(`Failed to store article metadata for ${source.name}:`, error)
     }
   }
 
   /**
-   * Store story cluster in database
+   * Store topic cluster in database using the new schema
    */
-  private async storeStoryCluster(cluster: StoryCluster) {
+  private async storeTopicCluster(cluster: StoryCluster, articles: RSSArticle[]) {
     try {
-      const { data, error } = await this.supabase
-        .from('story_clusters')
+      const { data: clusterData, error: clusterError } = await this.supabase
+        .from('topic_clusters')
         .insert({
-          primary_topic: cluster.primary_topic,
+          title: cluster.title,
           keywords: cluster.keywords,
-          detection_timestamp: cluster.detection_timestamp,
-          sources_found: cluster.sources_found,
-          sources_missing: cluster.sources_missing,
-          processing_status: cluster.processing_status,
-          trigger_source: cluster.trigger_source,
-          similarity_threshold: cluster.similarity_threshold,
+          main_topic: cluster.main_topic,
+          time_period_start: cluster.time_period_start,
+          time_period_end: cluster.time_period_end,
+          status: cluster.status,
+          cluster_method: cluster.cluster_method,
+          confidence_score: cluster.confidence_score,
           article_count: cluster.article_count,
+          geographic_focus: cluster.geographic_focus,
+          trending_score: cluster.trending_score,
           metadata: {
-            cluster_method: 'keyword_similarity',
-            articles_ids: cluster.articles.map(a => a.id)
+            ...cluster.metadata,
+            nonbulla_category: cluster.nonbulla_category,
+            articles_metadata: articles.map(a => ({
+              id: a.id,
+              title: a.title,
+              source_id: a.source_id,
+              quality_score: a.quality_score,
+              keywords: a.keywords
+            }))
           }
         })
         .select()
         .single()
 
-      if (error) {
-        console.error('Error storing story cluster:', error)
-      } else {
-        console.log(`🎯 Stored story cluster: "${cluster.primary_topic}"`)
+      if (clusterError) {
+        console.error('Error storing topic cluster:', clusterError)
+        return null
       }
 
-      return data
+      // Link articles to cluster
+      if (clusterData) {
+        const clusterArticles = articles.map(article => ({
+          cluster_id: clusterData.id,
+          article_id: article.id,
+          relevance_score: this.calculateArticleRelevance(article, cluster),
+          is_primary: article.source_id === cluster.metadata.trigger_source
+        }))
+
+        await this.supabase
+          .from('cluster_articles')
+          .insert(clusterArticles)
+      }
+
+      console.log(`🎯 Stored topic cluster: "${cluster.title}" with ${articles.length} articles`)
+      return clusterData
     } catch (error) {
-      console.error('Failed to store story cluster:', error)
+      console.error('Failed to store topic cluster:', error)
       return null
     }
   }
@@ -396,13 +471,8 @@ class EnhancedRSSCrawler {
     return content.replace(/<[^>]*>/g, '').trim().substring(0, 2000)
   }
 
-  private extractContent(item: any): string {
-    const content = item['content:encoded'] || 
-                   item.content || 
-                   item.contentSnippet || 
-                   item.summary || ''
-    return this.cleanContent(content)
-  }
+  // Remove full content extraction - we focus on metadata only
+  // Content will be retrieved later by AI engine when needed
 
   private extractCategories(categories: any): string[] {
     if (!categories) return []
@@ -439,16 +509,37 @@ class EnhancedRSSCrawler {
     return stopWords.includes(word)
   }
 
-  private findSimilarArticles(targetArticle: RSSArticle, allArticles: RSSArticle[], keywords: string[]): RSSArticle[] {
-    const similar = [targetArticle] // Include the original article
+  private findSimilarArticlesByMetadata(targetArticle: RSSArticle, allArticles: RSSArticle[]): RSSArticle[] {
+    const similar = [targetArticle]
     
     for (const article of allArticles) {
       if (article.id === targetArticle.id) continue
 
-      const articleKeywords = this.extractKeywords(article.title + ' ' + (article.description || ''))
-      const similarity = this.calculateSimilarity(keywords, articleKeywords)
+      // Multi-factor similarity scoring
+      let similarity = 0
+      
+      // Keyword similarity (50% weight)
+      const keywordSim = this.calculateSimilarity(targetArticle.keywords, article.keywords)
+      similarity += keywordSim * 0.5
+      
+      // Topic category match (25% weight)
+      if (targetArticle.topic_category === article.topic_category) {
+        similarity += 0.25
+      }
+      
+      // Time proximity (15% weight)
+      const timeDiff = Math.abs(
+        new Date(targetArticle.published_at).getTime() - 
+        new Date(article.published_at).getTime()
+      )
+      const hours = timeDiff / (1000 * 60 * 60)
+      if (hours < 6) similarity += 0.15
+      else if (hours < 24) similarity += 0.10
+      
+      // Quality threshold (10% weight)
+      if (article.quality_score > 70) similarity += 0.10
 
-      if (similarity > 0.3) { // 30% keyword overlap
+      if (similarity > 0.65) { // Higher threshold for metadata-based clustering
         similar.push(article)
       }
     }
@@ -465,12 +556,18 @@ class EnhancedRSSCrawler {
     return union.size > 0 ? intersection.size / union.size : 0
   }
 
-  private generatePrimaryTopic(articles: RSSArticle[]): string {
-    // Extract most common keywords across articles
+  // Enhanced clustering helper methods
+  
+  private generateClusterTitle(articles: RSSArticle[]): string {
+    // Use the highest quality article's title as base
+    const bestArticle = articles.sort((a, b) => b.quality_score - a.quality_score)[0]
+    return bestArticle.title.substring(0, 150)
+  }
+  
+  private generateMainTopic(articles: RSSArticle[]): string {
     const allKeywords: string[] = []
     articles.forEach(article => {
-      const keywords = this.extractKeywords(article.title + ' ' + (article.description || ''))
-      allKeywords.push(...keywords)
+      allKeywords.push(...article.keywords)
     })
 
     const keywordFreq = new Map()
@@ -480,30 +577,151 @@ class EnhancedRSSCrawler {
 
     const topKeywords = Array.from(keywordFreq.entries())
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 3)
+      .slice(0, 5)
       .map(([keyword]) => keyword)
 
-    return topKeywords.join(' ') || articles[0]?.title.substring(0, 100) || 'Unknown Topic'
+    return topKeywords.join(' ')
+  }
+  
+  private mergeKeywords(articles: RSSArticle[]): string[] {
+    const allKeywords = new Set<string>()
+    articles.forEach(article => {
+      article.keywords.forEach(keyword => allKeywords.add(keyword))
+    })
+    return Array.from(allKeywords).slice(0, 15) // Limit to top 15 keywords
+  }
+  
+  private getEarliestTimestamp(articles: RSSArticle[]): string {
+    return articles
+      .map(a => new Date(a.published_at))
+      .sort((a, b) => a.getTime() - b.getTime())[0]
+      .toISOString()
+  }
+  
+  private getLatestTimestamp(articles: RSSArticle[]): string {
+    return articles
+      .map(a => new Date(a.published_at))
+      .sort((a, b) => b.getTime() - a.getTime())[0]
+      .toISOString()
+  }
+  
+  private calculateClusterConfidence(articles: RSSArticle[]): number {
+    const avgQuality = articles.reduce((sum, a) => sum + a.quality_score, 0) / articles.length
+    const sourceCount = new Set(articles.map(a => a.source_id)).size
+    const timeSpan = new Date(this.getLatestTimestamp(articles)).getTime() - 
+                    new Date(this.getEarliestTimestamp(articles)).getTime()
+    const hoursSpan = timeSpan / (1000 * 60 * 60)
+    
+    let confidence = (avgQuality / 100) * 0.6 // Quality weight: 60%
+    confidence += Math.min(sourceCount / 4, 1) * 0.3 // Source diversity: 30%
+    confidence += (hoursSpan < 12 ? 1 : Math.max(0, 1 - hoursSpan / 48)) * 0.1 // Recency: 10%
+    
+    return Math.max(0, Math.min(1, confidence))
+  }
+  
+  private determineClusterCategory(articles: RSSArticle[]): NonbullaCategory {
+    const categoryCount = new Map<NonbullaCategory, number>()
+    articles.forEach(article => {
+      const count = categoryCount.get(article.topic_category) || 0
+      categoryCount.set(article.topic_category, count + 1)
+    })
+    
+    const [mostCommon] = Array.from(categoryCount.entries())
+      .sort((a, b) => b[1] - a[1])[0] || ['Alles', 0]
+    
+    return mostCommon
+  }
+  
+  private detectGeographicFocus(articles: RSSArticle[]): string | undefined {
+    const text = articles.map(a => a.title + ' ' + (a.description || '')).join(' ').toLowerCase()
+    
+    const locations = ['nederland', 'europa', 'amsterdam', 'den haag', 'rotterdam', 'utrecht', 'wereldwijd', 'internationaal']
+    const detected = locations.filter(loc => text.includes(loc))
+    
+    return detected.length > 0 ? detected[0] : undefined
+  }
+  
+  private calculateTrendingScore(articles: RSSArticle[]): number {
+    const now = Date.now()
+    const recentCount = articles.filter(article => {
+      const age = now - new Date(article.published_at).getTime()
+      return age < 6 * 60 * 60 * 1000 // Last 6 hours
+    }).length
+    
+    const sourceCount = new Set(articles.map(a => a.source_id)).size
+    const avgQuality = articles.reduce((sum, a) => sum + a.quality_score, 0) / articles.length
+    
+    return (recentCount / articles.length) * 0.4 +
+           Math.min(sourceCount / 5, 1) * 0.4 +
+           (avgQuality / 100) * 0.2
+  }
+  
+  private calculateArticleRelevance(article: RSSArticle, cluster: StoryCluster): number {
+    const keywordOverlap = this.calculateSimilarity(article.keywords, cluster.keywords)
+    const qualityNorm = article.quality_score / 100
+    const categoryMatch = article.topic_category === cluster.nonbulla_category ? 0.2 : 0
+    
+    return keywordOverlap * 0.6 + qualityNorm * 0.2 + categoryMatch
   }
 
-  private calculateQualityScore(article: RSSArticle, source: EnhancedNewsSource): number {
+  // New helper methods for metadata-focused approach
+  
+  private categorizeArticle(title: string, description: string, sourceCategory?: NonbullaCategory): NonbullaCategory {
+    const text = (title + ' ' + description).toLowerCase()
+    
+    // Keyword-based categorization for Dutch news
+    if (text.match(/(politiek|verkiezingen|regering|minister|kamer|partij|coalitie)/)) {
+      return 'Politiek'
+    } else if (text.match(/(economie|inflatie|rente|beurs|bedrijf|financieel|euro)/)) {
+      return 'Economie'
+    } else if (text.match(/(oorlog|conflict|militair|defensie|oekraïne|gaza|aanval)/)) {
+      return 'Oorlog'
+    } else if (text.match(/(wetenschap|onderzoek|studie|universiteit|klimaat|energie)/)) {
+      return 'Wetenschap'
+    } else if (text.match(/(technologie|ai|internet|app|software|tech|digitaal)/)) {
+      return 'Technologie'
+    } else if (text.match(/(feit|waarheid|nepnieuws|factcheck|bewijs|onderzoek)/)) {
+      return 'Feiten'
+    }
+    
+    return sourceCategory || 'Alles'
+  }
+  
+  private calculateInitialQualityScore(item: any, source: EnhancedNewsSource): number {
     let score = 50 // Base score
 
-    // Source credibility
-    score += (source.credibility_score - 50) * 0.3
+    // Source credibility (most important factor)
+    score += (source.credibility_score - 50) * 0.4
 
-    // Content quality
-    if (article.title && article.title.length > 10 && article.title.length < 200) score += 15
-    if (article.description && article.description.length > 50) score += 10
-    if (article.content && article.content.length > 200) score += 15
-    if (article.author) score += 10
+    // Metadata quality indicators
+    if (item.title && item.title.length > 10 && item.title.length < 200) score += 15
+    if (item.summary && item.summary.length > 50) score += 10
+    if (item.creator || item.author) score += 10
+    if (item.categories && item.categories.length > 0) score += 5
+    if (item.guid) score += 5
 
-    // Recency bonus (newer articles get higher scores)
-    const hoursOld = (Date.now() - new Date(article.published_at).getTime()) / (1000 * 60 * 60)
+    // Recency bonus
+    const hoursOld = (Date.now() - new Date(item.pubDate || item.isoDate || new Date()).getTime()) / (1000 * 60 * 60)
     if (hoursOld < 2) score += 10
     else if (hoursOld < 6) score += 5
 
     return Math.max(0, Math.min(100, Math.round(score)))
+  }
+  
+  private detectSentiment(text: string): number {
+    // Simple Dutch sentiment analysis
+    const positive = ['goed', 'positief', 'succes', 'winst', 'verbeterd', 'groei']
+    const negative = ['slecht', 'negatief', 'verlies', 'daling', 'crisis', 'probleem']
+    
+    const words = text.toLowerCase().split(/\s+/)
+    let score = 0
+    
+    words.forEach(word => {
+      if (positive.some(p => word.includes(p))) score += 1
+      if (negative.some(n => word.includes(n))) score -= 1
+    })
+    
+    return Math.max(-1, Math.min(1, score / Math.max(words.length / 10, 1)))
   }
 }
 

@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import CategoryNav from '@/components/CategoryNav'
+import NewsCard from '@/components/NewsCard'
 
 export default function Home() {
   const [articles, setArticles] = useState<any[]>([])
@@ -22,10 +24,16 @@ export default function Home() {
           console.log('🎯 First unified article:', data.data.articles[0]?.title)
           setArticles(data.data.articles.map((article: any) => ({
             ...article,
-            source: { name: `${article.sources_count} bronnen`, credibilityScore: 90, politicalLeaning: 'balanced' },
+            sources: article.source_names ? article.source_names.split(',').slice(0, 5) : [`${article.sources_count} bronnen`],
             publishedAt: article.generated_at,
-            description: `Samenvatting van ${article.sources_count} nieuwsbronnen`,
-            isUnified: true
+            summary: article.summary || `AI-gegenereerde samenvatting van ${article.sources_count} nieuwsbronnen`,
+            isUnified: true,
+            sourcesCount: article.sources_count,
+            politicalLeaning: article.political_leaning || 'balanced',
+            category: article.category || 'Algemeen',
+            readingTime: Math.ceil((article.content?.length || 1000) / 200) || 3,
+            isPerspective: true,
+            perspectiveCount: article.sources_count
           })))
           setIsUnifiedContent(true)
           setLoading(false)
@@ -105,114 +113,66 @@ export default function Home() {
     )
   }
 
-  // SUCCESS STATE - Show real articles!
+  // SUCCESS STATE - Show clean article cards!
   return (
-    <div className="min-h-screen bg-green-50 p-8">
-      <div className="max-w-6xl mx-auto">
-        
-        {/* SUCCESS HEADER */}
-        <div className={`${isUnifiedContent ? 'bg-purple-600' : 'bg-green-600'} text-white p-6 rounded-lg mb-8 text-center`}>
-          <h1 className="text-4xl font-bold mb-2">
-            {isUnifiedContent ? '🧠 AI SYNTHESIS!' : '🎉 RAW CONTENT!'}
-          </h1>
-          <h2 className="text-2xl">
-            {isUnifiedContent 
-              ? 'Nonbulla toont nu AI-gegenereerde nieuwssyntheses!' 
-              : 'Nonbulla toont nu ECHTE Nederlandse nieuws!'
-            }
-          </h2>
-          <p className={`mt-2 ${isUnifiedContent ? 'text-purple-100' : 'text-green-100'}`}>
-            {articles.length} {isUnifiedContent ? 'AI artikelen' : 'RSS artikelen'} geladen • Bijgewerkt: {new Date().toLocaleString('nl-NL')}
-          </p>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+      {/* Category Navigation */}
+      <CategoryNav />
+      
+      <div className="max-w-[1320px] mx-auto px-6 sm:px-8 lg:px-12">
+        {/* Header */}
+        <div className="py-8">
+          <div className="text-center mb-8">
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+              {isUnifiedContent ? 'Multi-Perspectief Nieuws' : 'Laatste Nieuws'}
+            </h1>
+            <p className="text-gray-600 dark:text-gray-400">
+              {isUnifiedContent 
+                ? `${articles.length} AI-gegenereerde syntheses van meerdere bronnen` 
+                : `${articles.length} artikelen van Nederlandse nieuwsbronnen`
+              }
+            </p>
+            {isUnifiedContent && (
+              <div className="inline-flex items-center gap-2 mt-3 px-3 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full text-sm">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                </svg>
+                AI-gegenereerd
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* FIRST ARTICLE HIGHLIGHT */}
-        <div className="bg-blue-100 border border-blue-400 rounded-lg p-6 mb-8">
-          <h3 className="text-xl font-bold text-blue-800 mb-2">🎯 Eerste artikel (bewijs dat het werkt):</h3>
-          <h4 className="text-2xl font-bold text-blue-900 mb-2">"{articles[0]?.title}"</h4>
-          <p className="text-blue-700">
-            Bron: <span className="font-semibold">{articles[0]?.source?.name}</span> • 
-            Gepubliceerd: {new Date(articles[0]?.publishedAt).toLocaleString('nl-NL')}
-          </p>
-        </div>
-
-        {/* ALL ARTICLES */}
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 mb-8">
-          {articles.slice(0, 9).map((article, index) => (
-            <div key={article.id} className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow">
-              <div className="flex items-start justify-between mb-3">
-                <span className="bg-green-100 text-green-800 text-xs font-semibold px-2 py-1 rounded">
-                  {article.source?.name || 'Onbekende bron'}
-                </span>
-                <span className="text-gray-500 text-xs">
-                  #{index + 1}
-                </span>
-              </div>
-              
-              <h3 className="font-bold text-lg text-gray-900 mb-2 leading-tight">
-                {article.title}
-              </h3>
-              
-              <p className="text-gray-600 text-sm mb-3 line-clamp-3">
-                {article.description || 'Geen beschrijving beschikbaar'}
-              </p>
-              
-              <div className="flex items-center justify-between text-xs text-gray-500">
-                <span>{article.categories?.[0] || 'Algemeen'}</span>
-                <span>{new Date(article.publishedAt).toLocaleDateString('nl-NL')}</span>
-              </div>
-
-              {article.url && (
-                <a 
-                  href={article.url} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="mt-3 inline-block bg-blue-600 text-white text-xs px-3 py-1 rounded hover:bg-blue-700"
-                >
-                  Lees volledig artikel →
-                </a>
-              )}
-            </div>
+        {/* Articles Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 pb-12">
+          {articles.map((article) => (
+            <NewsCard
+              key={article.id}
+              id={article.id}
+              title={article.title}
+              summary={article.summary || article.description || 'Geen samenvatting beschikbaar'}
+              imageUrl={article.image_url}
+              publishedAt={article.publishedAt}
+              sources={article.sources || [article.source?.name || 'Onbekende bron']}
+              category={article.category}
+              readingTime={article.readingTime}
+              isPerspective={article.isPerspective}
+              perspectiveCount={article.perspectiveCount}
+              isUnified={article.isUnified}
+              sourcesCount={article.sourcesCount}
+              politicalLeaning={article.politicalLeaning}
+            />
           ))}
         </div>
-
-        {/* TECHNICAL INFO */}
-        <div className="bg-gray-100 rounded-lg p-6">
-          <h3 className="font-bold text-lg mb-4">🔧 Technische Details</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-            <div>
-              <strong>Artikelen geladen:</strong> {articles.length}
-            </div>
-            <div>
-              <strong>Data bron:</strong> Live RSS feeds
-            </div>
-            <div>
-              <strong>Update frequentie:</strong> Elke 2 uur
-            </div>
+        
+        {/* Load more section */}
+        {articles.length > 0 && (
+          <div className="text-center py-8">
+            <button className="px-6 py-3 bg-nonbulla-blue-600 hover:bg-nonbulla-blue-700 text-white rounded-lg font-medium transition-colors duration-200">
+              Meer artikelen laden
+            </button>
           </div>
-          <div className="mt-4 text-xs text-gray-600">
-            <p><strong>Bronnen:</strong> {Array.from(new Set(articles.map(a => a.source?.name))).filter(Boolean).join(', ')}</p>
-            <p className="mt-1"><strong>Laatste update:</strong> {new Date().toLocaleString('nl-NL')}</p>
-          </div>
-        </div>
-
-        {/* NAVIGATION */}
-        <div className="mt-8 text-center">
-          <p className="text-gray-600 mb-4">
-            🎯 Dit bewijst dat Nonbulla nu werkt met echte Nederlandse nieuws!
-          </p>
-          <div className="space-x-4">
-            <a href="/nederland" className="bg-orange-600 text-white px-6 py-2 rounded hover:bg-orange-700">
-              Nederland →
-            </a>
-            <a href="/europa" className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700">
-              Europa →
-            </a>
-            <a href="/wereld" className="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700">
-              Wereld →
-            </a>
-          </div>
-        </div>
+        )}
       </div>
     </div>
   )

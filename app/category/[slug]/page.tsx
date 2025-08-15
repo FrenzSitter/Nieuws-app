@@ -1,413 +1,235 @@
-import { notFound } from 'next/navigation'
-import CategoryBar from '@/components/CategoryBar'
-import CategorySubNav from '@/components/CategorySubNav'
-import NewsCard from '@/components/NewsCard'
-import { rssManager } from '@/lib/rss-parser'
+'use client'
 
-interface CategoryPageProps {
-  params: {
-    slug: string
-  }
-}
+import { useState, useEffect } from 'react'
+import { useParams } from 'next/navigation'
+import CategoryNav from '@/components/CategoryNav'
+import NewsCard from '@/components/NewsCard'
+
 
 const categoryMap: Record<string, string> = {
-  // Legacy categories (for backwards compatibility)
-  'politics': 'Politiek',
-  'technology': 'Technologie', 
-  'world': 'Wereld',
-  'business': 'Economie',
-  'sports': 'Sport',
-  'culture': 'Cultuur',
-  
-  // New geographic structure
-  'nederland': 'Nederland',
-  'europa': 'Europa',
-  'wereld': 'Wereld',
-  
-  // Nederland subcategories
-  'nederland-politiek': 'Nederlandse Politiek',
-  'nederland-economie': 'Nederlandse Economie',
-  'nederland-sport': 'Nederlandse Sport',
-  'nederland-wetenschap': 'Nederlandse Wetenschap',
-  'nederland-feiten': 'Nederlandse Feiten',
-  
-  // Europa subcategories
-  'europa-politiek': 'Europese Politiek',
-  'europa-economie': 'Europese Economie',
-  'europa-oorlog': 'Oorlog in Europa',
-  'europa-wetenschap': 'Europese Wetenschap',
-  'europa-feiten': 'Europese Feiten',
-  
-  // Wereld subcategories
-  'wereld-politiek': 'Wereldpolitiek',
-  'wereld-economie': 'Wereldeconomie',
-  'wereld-oorlog': 'Oorlog in de Wereld',
-  'wereld-sport': 'Wereldsport',
-  'wereld-wetenschap': 'Wereldwetenschap',
-  'wereld-feiten': 'Wereldfeiten'
+  'politiek': 'Politiek',
+  'economie': 'Economie', 
+  'oorlog': 'Oorlog',
+  'wetenschap': 'Wetenschap',
+  'technologie': 'Technologie',
+  'feiten': 'Feiten'
 }
 
 const categoryDescriptions: Record<string, string> = {
-  // Legacy descriptions
-  'politics': 'Het laatste politieke nieuws uit Nederland en Europa. Van verkiezingen tot beleidsbeslissingen.',
-  'technology': 'Innovatie, AI, startups en de digitale transformatie van Nederland.',
-  'world': 'Internationale ontwikkelingen en hun impact op Nederland.',
-  'business': 'Economisch nieuws, bedrijfsleven en financiële markten.',
-  'sports': 'Nederlandse en internationale sport, van voetbal tot Formule 1.',
-  'culture': 'Kunst, cultuur, entertainment en Nederlandse culturele evenementen.',
-  
-  // Main geographic categories
-  'nederland': 'Al het Nederlandse nieuws op één plek. Van politiek tot sport, van de Randstad tot de provincie.',
-  'europa': 'Europese ontwikkelingen die Nederland raken. Politiek, economie en maatschappij vanuit Europees perspectief.',
-  'wereld': 'Internationale nieuwsgebeurtenissen met wereldwijde impact en hun gevolgen voor Nederland.',
-  
-  // Nederland subcategories
-  'nederland-politiek': 'Nederlandse politiek, verkiezingen, coalitieformatie en beleidsbeslissingen uit Den Haag.',
-  'nederland-economie': 'Nederlandse economie, bedrijfsleven, arbeidsmarkt en financiële ontwikkelingen.',
-  'nederland-sport': 'Nederlandse sport, van Eredivisie tot Olympische Spelen en alles daartussen.',
-  'nederland-wetenschap': 'Nederlandse wetenschappelijke doorbraken, onderzoek en innovatie.',
-  'nederland-feiten': 'Fact-checks, onderzoeksjournalistiek en duiding van Nederlandse nieuwsfeiten.',
-  
-  // Europa subcategories
-  'europa-politiek': 'Europese Unie, verkiezingen en politieke ontwikkelingen die Nederland raken.',
-  'europa-economie': 'Europese economische ontwikkelingen, handel en monetair beleid van de ECB.',
-  'europa-oorlog': 'Conflicten en veiligheidssituatie in Europa, vooral de oorlog in Oekraïne.',
-  'europa-wetenschap': 'Europese wetenschappelijke samenwerking, onderzoek en technologische vooruitgang.',
-  'europa-feiten': 'Fact-checks en analyse van Europese ontwikkelingen en hun impact op Nederland.',
-  
-  // Wereld subcategories
-  'wereld-politiek': 'Internationale politiek, diplomatie en geopolitieke ontwikkelingen wereldwijd.',
-  'wereld-economie': 'Wereldeconomie, internationale handel en financiële markten buiten Europa.',
-  'wereld-oorlog': 'Conflicten en oorlogen wereldwijd en hun internationale gevolgen.',
-  'wereld-sport': 'Internationale sport, Wereldkampioenschappen en sportevenementen buiten Nederland.',
-  'wereld-wetenschap': 'Internationale wetenschappelijke ontwikkelingen en wereldwijde onderzoeksprojecten.',
-  'wereld-feiten': 'Internationale fact-checks en analyse van wereldwijde nieuwsgebeurtenissen.'
+  'politiek': 'Politieke ontwikkelingen vanuit meerdere perspectieven. Van lokale besluitvorming tot internationale betrekkingen.',
+  'economie': 'Economische trends en analyses met impact op samenleving en bedrijfsleven.',
+  'oorlog': 'Conflicten en veiligheidskwesties wereldwijd met gebalanceerde berichtgeving.',
+  'wetenschap': 'Wetenschappelijke doorbraken, onderzoek en innovaties die ons leven veranderen.',
+  'technologie': 'Technologische ontwikkelingen, digitale transformatie en hun maatschappelijke impact.',
+  'feiten': 'Fact-checks, onderzoeksjournalistiek en verificatie van nieuwsfeiten.'
 }
 
-const categoryIcons: Record<string, React.ReactNode> = {
-  // Geographic main categories
-  'nederland': (
-    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
-    </svg>
-  ),
-  'europa': (
-    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-    </svg>
-  ),
-  'wereld': (
-    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-    </svg>
-  ),
-  
-  // Legacy and specific category icons
-  'politics': (
-    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
-    </svg>
-  ),
-  'nederland-politiek': (
-    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
-    </svg>
-  ),
-  'europa-politiek': (
-    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
-    </svg>
-  ),
-  'wereld-politiek': (
-    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
-    </svg>
-  ),
-  'technology': (
-    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-    </svg>
-  ),
-  'world': (
-    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-    </svg>
-  ),
-  'business': (
-    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-    </svg>
-  ),
-  'sports': (
-    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-    </svg>
-  ),
-  'culture': (
-    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 4V2a1 1 0 011-1h8a1 1 0 011 1v2m3 0H4a2 2 0 00-2 2v12a2 2 0 002 2h16a2 2 0 002-2V6a2 2 0 00-2-2zM8 10h8M8 14h8M8 18h8" />
-    </svg>
-  ),
-  
-  // Use default icon for categories without specific icons
-  'default': (
-    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9.5a2 2 0 00-2-2h-2m-4-3v9" />
-    </svg>
-  )
-}
 
-export default async function CategoryPage({ params }: CategoryPageProps) {
-  const { slug } = params
-  
-  const categoryName = categoryMap[slug]
-  if (!categoryName) {
-    notFound()
-  }
-  
-  // Fetch real articles from database - map category to database format
-  const dbCategory = slug.split('-')[0] // Extract base category (nederland, europa, wereld)
-  const rawArticles = await rssManager.getArticlesByCategory(dbCategory, 20)
-  
-  // Transform articles for UI components
-  const articles = rawArticles.map(article => ({
-    id: article.id,
-    title: article.title,
-    summary: article.description || article.content?.substring(0, 150) + '...' || '',
-    imageUrl: '', // We don't have images from RSS yet
-    publishedAt: article.published_at,
-    sources: [{ name: article.news_sources?.name || 'Unknown Source' }],
-    category: article.categories?.[0] || dbCategory,
-    readingTime: Math.max(1, Math.ceil((article.content?.length || 0) / 200)),
-    perspectiveCount: 1
-  }))
-  
+export default function CategoryPage() {
+  const params = useParams()
+  const slug = params?.slug as string
+  const [articles, setArticles] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string>('')
+  const [isUnifiedContent, setIsUnifiedContent] = useState(false)
+
+  const categoryName = categoryMap[slug] || 'Categorie'
   const description = categoryDescriptions[slug] || ''
-  const icon = categoryIcons[slug] || categoryIcons['default']
-  
-  // Get some stats for this category
-  const totalArticles = articles.length
-  const sourcesUsed = new Set(articles.flatMap(article => article.sources.map(s => s.name))).size
-  const averagePerspectives = articles.length > 0 ? Math.round(
-    articles.reduce((sum, article) => sum + article.perspectiveCount, 0) / articles.length
-  ) : 1
 
-  return (
-    <div className="space-y-8">
-      {/* Category Bar */}
-      <div className="-mt-12">
-        <CategoryBar currentSlug={`/category/${slug}`} />
-      </div>
-
-      {/* Category Header */}
-      <div className="text-center space-y-6 py-8">
-        <div className="flex justify-center">
-          <div className="w-16 h-16 bg-gradient-to-br from-nonbulla-blue-500 to-nonbulla-blue-600 rounded-2xl flex items-center justify-center text-white">
-            {icon}
-          </div>
-        </div>
+  useEffect(() => {
+    console.log(`🚀 Loading articles for category: ${categoryName}...`)
+    
+    // Try to fetch AI-generated articles for this category
+    const apiUrl = `/api/ai/generate-article?action=recent&limit=10&category=${slug}&t=${Date.now()}`
+    
+    fetch(apiUrl)
+      .then(response => response.json())
+      .then(data => {
+        console.log(`🧠 AI Articles for ${categoryName}:`, data)
         
-        <div className="space-y-4">
-          <h1 className="text-4xl sm:text-5xl font-display font-bold text-gray-900 dark:text-gray-100">
-            {categoryName}
-          </h1>
-          <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto leading-relaxed">
-            {description}
-          </p>
-        </div>
+        if (data.success && data.data?.articles && data.data.articles.length > 0) {
+          console.log('✅ SUCCESS! Got', data.data.articles.length, `AI articles for ${categoryName}`)
+          setArticles(data.data.articles.map((article: any) => ({
+            ...article,
+            sources: article.source_names ? article.source_names.split(',').slice(0, 5) : [`${article.sources_count} bronnen`],
+            publishedAt: article.generated_at,
+            summary: article.summary || `AI-gegenereerde samenvatting van ${article.sources_count} nieuwsbronnen`,
+            isUnified: true,
+            sourcesCount: article.sources_count,
+            politicalLeaning: article.political_leaning || 'balanced',
+            category: categoryName,
+            readingTime: Math.ceil((article.content?.length || 1000) / 200) || 3,
+            isPerspective: true,
+            perspectiveCount: article.sources_count
+          })))
+          setIsUnifiedContent(true)
+          setLoading(false)
+        } else {
+          console.log('⚠️ No AI articles for category, falling back to raw articles...')
+          
+          // Fallback to raw articles for this category
+          return fetch(`/api/articles/recent?limit=10&category=${slug}&t=${Date.now()}`)
+        }
+      })
+      .then(response => {
+        if (!response) return null
+        console.log('📡 Raw Articles Response status:', response.status)
+        return response.json()
+      })
+      .then(data => {
+        if (!data) return
+        console.log('📋 Raw Articles Response:', data)
+        
+        if (data.success && data.data) {
+          console.log('✅ FALLBACK SUCCESS! Got', data.data.length, 'raw articles')
+          setArticles(data.data.map((article: any) => ({
+            ...article,
+            sources: [article.source?.name || 'Onbekende bron'],
+            summary: article.description || 'Geen samenvatting beschikbaar',
+            category: categoryName,
+            readingTime: 3,
+            isPerspective: false,
+            perspectiveCount: 1,
+            isUnified: false
+          })))
+          setIsUnifiedContent(false)
+        } else {
+          console.error('❌ Both APIs failed for category:', data)
+          setError('Geen artikelen gevonden voor deze categorie')
+        }
+        setLoading(false)
+      })
+      .catch(err => {
+        console.error('🔥 Fetch Error:', err)
+        setError(err.message)
+        setLoading(false)
+      })
+  }, [slug, categoryName])
 
-        {/* Category Stats */}
-        <div className="flex justify-center">
-          <div className="flex items-center gap-8 px-8 py-4 bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-xl border border-gray-200/50 dark:border-gray-700/50">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-nonbulla-blue-600 dark:text-nonbulla-blue-400">
-                {totalArticles}
-              </div>
-              <div className="text-sm text-gray-500 dark:text-gray-400">
-                Artikelen
-              </div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-perspective-green-600 dark:text-perspective-green-400">
-                {sourcesUsed}
-              </div>
-              <div className="text-sm text-gray-500 dark:text-gray-400">
-                Bronnen
-              </div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-analysis-purple-600 dark:text-analysis-purple-400">
-                {averagePerspectives}
-              </div>
-              <div className="text-sm text-gray-500 dark:text-gray-400">
-                Gem. Perspectieven
-              </div>
-            </div>
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+        <CategoryNav currentCategory={slug} />
+        <div className="max-w-[1320px] mx-auto px-6 sm:px-8 lg:px-12">
+          <div className="py-16 text-center">
+            <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-nonbulla-blue-600 mx-auto mb-4"></div>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+              Laden van {categoryName} artikelen...
+            </h1>
+            <p className="text-gray-600 dark:text-gray-400 mt-2">
+              Zoeken naar multi-perspectief content
+            </p>
           </div>
         </div>
       </div>
+    )
+  }
 
-      {/* Category Sub-Navigation */}
-      {(slug.startsWith('nederland-') || slug.startsWith('europa-') || slug.startsWith('wereld-')) && (
-        <CategorySubNav 
-          mainCategory={
-            slug.startsWith('nederland') ? 'nederland' : 
-            slug.startsWith('europa') ? 'europa' : 
-            slug.startsWith('wereld') ? 'wereld' : 
-            slug
-          } 
-          currentSlug={slug} 
-        />
-      )}
-
-      {/* Featured Article */}
-      {articles.length > 0 && (
-        <div className="space-y-4">
-          <h2 className="text-2xl font-display font-bold text-gray-900 dark:text-gray-100">
-            Uitgelicht in {categoryName}
-          </h2>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {articles.slice(0, 2).map((article) => (
-              <div key={article.id} className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-2xl border border-gray-200/50 dark:border-gray-700/50 hover:shadow-xl transition-all duration-300 hover:scale-[1.01] overflow-hidden">
-                <div className="relative aspect-[16/9] overflow-hidden">
-                  <img
-                    src={article.imageUrl}
-                    alt={article.title}
-                    className="w-full h-full object-cover"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
-                  <div className="absolute bottom-4 left-4 right-4">
-                    <h3 className="text-xl font-bold text-white leading-tight mb-2">
-                      {article.title}
-                    </h3>
-                    <p className="text-gray-200 text-sm line-clamp-2">
-                      {article.summary}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Articles Grid */}
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-display font-bold text-gray-900 dark:text-gray-100">
-            Alle {categoryName} Artikelen
-          </h2>
-          <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
-            <span>Gesorteerd op: Nieuwste eerst</span>
-            <button className="text-nonbulla-blue-600 dark:text-nonbulla-blue-400 hover:text-nonbulla-blue-700 dark:hover:text-nonbulla-blue-300 font-semibold">
-              Filter ↓
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+        <CategoryNav currentCategory={slug} />
+        <div className="max-w-[1320px] mx-auto px-6 sm:px-8 lg:px-12">
+          <div className="py-16 text-center">
+            <div className="text-red-600 text-6xl mb-4">⚠️</div>
+            <h1 className="text-3xl font-bold text-red-800 dark:text-red-400 mb-4">
+              Fout bij laden van artikelen
+            </h1>
+            <p className="text-red-600 dark:text-red-400 mb-6">{error}</p>
+            <button 
+              onClick={() => window.location.reload()} 
+              className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-medium transition-colors duration-200"
+            >
+              Probeer opnieuw
             </button>
           </div>
         </div>
-        
-        {articles.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {articles.map((article) => (
-              <NewsCard
-                key={article.id}
-                id={article.id}
-                title={article.title}
-                summary={article.summary}
-                imageUrl={article.imageUrl}
-                publishedAt={article.publishedAt}
-                sources={Array.isArray(article.sources) 
-                  ? article.sources.map((source: any) => String(source?.name || source || 'Unknown')).filter(Boolean)
-                  : []
-                }
-                category={article.category}
-                readingTime={article.readingTime}
-                isPerspective={article.perspectiveCount > 1}
-                perspectiveCount={article.perspectiveCount}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-12">
-            <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9.5a2 2 0 00-2-2h-2m-4-3v9" />
-              </svg>
-            </div>
-            <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
-              Geen artikelen gevonden
-            </h3>
-            <p className="text-gray-600 dark:text-gray-400">
-              Er zijn momenteel geen artikelen beschikbaar in de categorie {categoryName}.
-            </p>
-          </div>
-        )}
       </div>
+    )
+  }
 
-      {/* Related Categories */}
-      <div className="bg-gradient-to-br from-gray-50/50 to-white/50 dark:from-gray-900/50 dark:to-gray-800/50 -mx-6 sm:-mx-8 lg:-mx-12 px-6 sm:px-8 lg:px-12 py-12 rounded-2xl">
-        <div className="text-center space-y-6">
-          <h2 className="text-2xl font-display font-bold text-gray-900 dark:text-gray-100">
-            Ontdek Meer Categorieën
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {Object.entries(categoryMap)
-              .filter(([key]) => key !== slug)
-              .slice(0, 6)
-              .map(([key, name]) => (
-                <a
-                  key={key}
-                  href={`/category/${key}`}
-                  className="flex items-center gap-3 p-4 bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-xl hover:shadow-lg transition-all duration-300 hover:scale-105"
-                >
-                  <div className="text-nonbulla-blue-600 dark:text-nonbulla-blue-400">
-                    {categoryIcons[key]}
-                  </div>
-                  <span className="font-semibold text-gray-900 dark:text-gray-100">
-                    {name}
-                  </span>
-                </a>
-              ))}
+  if (articles.length === 0) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+        <CategoryNav currentCategory={slug} />
+        <div className="max-w-[1320px] mx-auto px-6 sm:px-8 lg:px-12">
+          <div className="py-16 text-center">
+            <div className="text-gray-400 text-6xl mb-4">📰</div>
+            <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-200 mb-4">
+              Geen {categoryName} artikelen gevonden
+            </h1>
+            <p className="text-gray-600 dark:text-gray-400">
+              Er zijn momenteel geen artikelen beschikbaar voor deze categorie.
+            </p>
           </div>
         </div>
       </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+      {/* Category Navigation */}
+      <CategoryNav currentCategory={slug} />
+      
+      <div className="max-w-[1320px] mx-auto px-6 sm:px-8 lg:px-12">
+        {/* Header */}
+        <div className="py-8">
+          <div className="text-center mb-8">
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+              {categoryName}
+            </h1>
+            <p className="text-gray-600 dark:text-gray-400 mb-4">
+              {description}
+            </p>
+            <p className="text-gray-500 dark:text-gray-400">
+              {isUnifiedContent 
+                ? `${articles.length} AI-gegenereerde syntheses van meerdere bronnen` 
+                : `${articles.length} artikelen van Nederlandse nieuwsbronnen`
+              }
+            </p>
+            {isUnifiedContent && (
+              <div className="inline-flex items-center gap-2 mt-3 px-3 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full text-sm">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                </svg>
+                AI-gegenereerd
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Articles Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 pb-12">
+          {articles.map((article) => (
+            <NewsCard
+              key={article.id}
+              id={article.id}
+              title={article.title}
+              summary={article.summary}
+              imageUrl={article.image_url}
+              publishedAt={article.publishedAt}
+              sources={article.sources}
+              category={article.category}
+              readingTime={article.readingTime}
+              isPerspective={article.isPerspective}
+              perspectiveCount={article.perspectiveCount}
+              isUnified={article.isUnified}
+              sourcesCount={article.sourcesCount}
+              politicalLeaning={article.politicalLeaning}
+            />
+          ))}
+        </div>
+        
+        {/* Load more section */}
+        {articles.length > 0 && (
+          <div className="text-center py-8">
+            <button className="px-6 py-3 bg-nonbulla-blue-600 hover:bg-nonbulla-blue-700 text-white rounded-lg font-medium transition-colors duration-200">
+              Meer {categoryName.toLowerCase()} artikelen laden
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   )
-}
-
-// Generate static params for all categories
-export function generateStaticParams() {
-  return Object.keys(categoryMap).map((slug) => ({
-    slug,
-  }))
-}
-
-// Add dynamic metadata for SEO
-export async function generateMetadata({ params }: CategoryPageProps) {
-  const { slug } = params
-  const categoryName = categoryMap[slug]
-  
-  if (!categoryName) {
-    return {
-      title: 'Categorie niet gevonden - Nonbulla',
-      description: 'De gevraagde nieuwscategorie kon niet worden gevonden.'
-    }
-  }
-
-  const description = categoryDescriptions[slug] || `Lees het laatste nieuws over ${categoryName}`
-  
-  return {
-    title: `${categoryName} - Nonbulla`,
-    description: description,
-    openGraph: {
-      title: `${categoryName} - Nonbulla`,
-      description: description,
-      type: 'website',
-    },
-    twitter: {
-      card: 'summary',
-      title: `${categoryName} - Nonbulla`,
-      description: description,
-    }
-  }
 }

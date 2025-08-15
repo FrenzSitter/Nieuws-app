@@ -41,15 +41,15 @@ class CrossReferenceEngine {
   ]
 
   /**
-   * Main cross-reference analysis volgens jouw workflow
+   * Main cross-reference analysis for topic clusters using new schema
    */
-  async analyzeStoryCluster(clusterId: string): Promise<CrossReferenceResult> {
-    console.log(`🔍 Analyzing cross-references for cluster: ${clusterId}`)
+  async analyzeTopicCluster(clusterId: string): Promise<CrossReferenceResult> {
+    console.log(`🔍 Analyzing cross-references for topic cluster: ${clusterId}`)
 
-    // Get cluster with articles
-    const cluster = await this.getClusterWithArticles(clusterId)
+    // Get cluster with articles using new schema
+    const cluster = await this.getTopicClusterWithArticles(clusterId)
     if (!cluster) {
-      throw new Error(`Cluster ${clusterId} not found`)
+      throw new Error(`Topic cluster ${clusterId} not found`)
     }
 
     // Determine trigger source and rule
@@ -61,7 +61,7 @@ class CrossReferenceEngine {
 
     // Find trigger article (NU.nl article that started this)
     const triggerArticle = cluster.articles.find((article: any) => 
-      this.matchesSourcePattern(article.source_name, rule.trigger_source)
+      this.matchesSourcePattern(article.source_name || article.news_sources?.name, rule.trigger_source)
     )
 
     if (!triggerArticle) {
@@ -69,12 +69,12 @@ class CrossReferenceEngine {
       return this.createInsufficientResult(cluster)
     }
 
-    console.log(`📰 Trigger article: "${triggerArticle.title}" from ${triggerArticle.source_name}`)
+    console.log(`📰 Trigger article: "${triggerArticle.title}" from ${triggerArticle.source_name || triggerArticle.news_sources?.name}`)
 
     // Check for matches in required sources
     const matchAnalysis = await this.findCrossSourceMatches(cluster, rule, triggerArticle)
 
-    // Determine processing recommendation
+    // Determine processing recommendation based on Nonbulla concept
     const recommendation = this.determineProcessingRecommendation(matchAnalysis, rule)
 
     const result: CrossReferenceResult = {
@@ -90,14 +90,19 @@ class CrossReferenceEngine {
     }
 
     // Update cluster status based on recommendation
-    await this.updateClusterStatus(clusterId, result)
+    await this.updateTopicClusterStatus(clusterId, result)
 
     console.log(`✅ Cross-reference analysis complete: ${recommendation}`)
     return result
   }
+  
+  // Keep backward compatibility
+  async analyzeStoryCluster(clusterId: string): Promise<CrossReferenceResult> {
+    return this.analyzeTopicCluster(clusterId)
+  }
 
   /**
-   * Process delayed rechecks (run elke 15 minuten via cron)
+   * Process delayed rechecks for topic clusters (run elke 15 minuten via cron)
    */
   async processDelayedRechecks(): Promise<{
     processed: number
@@ -105,7 +110,7 @@ class CrossReferenceEngine {
     still_waiting: number
     exceeded_attempts: number
   }> {
-    console.log('⏰ Processing delayed cross-reference rechecks...')
+    console.log('⏰ Processing delayed cross-reference rechecks for topic clusters...')
 
     const delayedClusters = await this.getDelayedProcessingClusters()
     
@@ -119,28 +124,29 @@ class CrossReferenceEngine {
     for (const cluster of delayedClusters) {
       try {
         // Re-crawl missing sources specifically
-        await this.recheckMissingSources(cluster.id, cluster.sources_missing)
+        const missingSourceIds = cluster.metadata?.sources_missing || []
+        await this.recheckMissingSources(cluster.id, missingSourceIds)
 
-        // Re-analyze cluster
-        const analysis = await this.analyzeStoryCluster(cluster.id)
+        // Re-analyze cluster using new method
+        const analysis = await this.analyzeTopicCluster(cluster.id)
 
         if (analysis.processing_recommendation === 'immediate') {
           results.successful++
-          console.log(`✅ Cluster ${cluster.id} now ready for processing`)
+          console.log(`✅ Topic cluster ${cluster.id} now ready for AI synthesis`)
         } else if (cluster.metadata?.attempt_count >= 3) {
-          // Max attempts reached
-          await this.markClusterAsExceededAttempts(cluster.id)
+          // Max attempts reached - mark as ready with limited sources
+          await this.markClusterAsReadyWithLimitedSources(cluster.id)
           results.exceeded_attempts++
-          console.log(`⏸️ Cluster ${cluster.id} exceeded max recheck attempts`)
+          console.log(`⚠️ Topic cluster ${cluster.id} proceeding with limited sources`)
         } else {
           // Schedule another recheck
           await this.scheduleAnotherRecheck(cluster.id)
           results.still_waiting++
-          console.log(`⏳ Cluster ${cluster.id} scheduled for another recheck`)
+          console.log(`⏳ Topic cluster ${cluster.id} scheduled for another recheck`)
         }
 
       } catch (error) {
-        console.error(`Error processing delayed cluster ${cluster.id}:`, error)
+        console.error(`Error processing delayed topic cluster ${cluster.id}:`, error)
       }
     }
 
@@ -228,11 +234,11 @@ class CrossReferenceEngine {
   }
 
   /**
-   * Get cluster with associated articles
+   * Get topic cluster with associated articles using new database schema
    */
-  private async getClusterWithArticles(clusterId: string) {
+  private async getTopicClusterWithArticles(clusterId: string) {
     const { data: cluster, error: clusterError } = await this.supabase
-      .from('story_clusters')
+      .from('topic_clusters')
       .select('*')
       .eq('id', clusterId)
       .single()
@@ -241,35 +247,41 @@ class CrossReferenceEngine {
       return null
     }
 
-    // Get articles that match this cluster's keywords and timeframe
-    const { data: articles } = await this.supabase
-      .from('raw_articles')
+    // Get articles linked to this cluster via cluster_articles junction table
+    const { data: clusterArticles } = await this.supabase
+      .from('cluster_articles')
       .select(`
-        *,
-        news_sources (
-          name,
-          credibility_score,
-          political_leaning,
-          metadata
+        relevance_score,
+        is_primary,
+        raw_articles!inner (
+          *,
+          news_sources!inner (
+            name,
+            credibility_score,
+            political_leaning,
+            metadata
+          )
         )
       `)
-      .gte('published_at', new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString())
-      .order('published_at', { ascending: false })
+      .eq('cluster_id', clusterId)
+      .order('relevance_score', { ascending: false })
 
-    if (!articles) return { ...cluster, articles: [] }
-
-    // Filter articles that match cluster keywords
-    const matchingArticles = articles.filter(article => 
-      this.articleMatchesClusterKeywords(article, cluster.keywords)
-    )
+    const articles = clusterArticles?.map(ca => ({
+      ...ca.raw_articles,
+      relevance_score: ca.relevance_score,
+      is_primary: ca.is_primary,
+      source_name: ca.raw_articles.news_sources?.name || 'Unknown'
+    })) || []
 
     return {
       ...cluster,
-      articles: matchingArticles.map(article => ({
-        ...article,
-        source_name: article.news_sources?.name || 'Unknown'
-      }))
+      articles
     }
+  }
+  
+  // Keep backward compatibility
+  private async getClusterWithArticles(clusterId: string) {
+    return this.getTopicClusterWithArticles(clusterId)
   }
 
   /**
@@ -347,37 +359,78 @@ class CrossReferenceEngine {
   }
 
   /**
-   * Update cluster status based on analysis
+   * Update topic cluster status based on cross-reference analysis
    */
-  private async updateClusterStatus(clusterId: string, result: CrossReferenceResult) {
+  private async updateTopicClusterStatus(clusterId: string, result: CrossReferenceResult) {
+    const now = new Date().toISOString()
     const updateData: any = {
-      sources_found: result.matched_articles.map(a => a.source_name),
-      sources_missing: result.missing_sources,
-      updated_at: new Date().toISOString()
+      updated_at: now
     }
 
+    // Update metadata with cross-reference results
+    const currentCluster = await this.supabase
+      .from('topic_clusters')
+      .select('metadata')
+      .eq('id', clusterId)
+      .single()
+
+    const existingMetadata = currentCluster.data?.metadata || {}
+    
     switch (result.processing_recommendation) {
       case 'immediate':
-        updateData.processing_status = 'analyzing'
+        updateData.status = 'ready_for_ai'
+        updateData.metadata = {
+          ...existingMetadata,
+          cross_reference: {
+            sources_found: result.matched_articles.map(a => a.source_name || a.news_sources?.name),
+            sources_missing: result.missing_sources,
+            cross_reference_score: result.cross_reference_score,
+            analysis_completed_at: now,
+            ready_for_synthesis: true
+          }
+        }
         break
       case 'delayed':
-        updateData.processing_status = 'detecting'
-        updateData.recheck_scheduled_at = result.recheck_scheduled_at
+        updateData.status = 'analyzing' // Keep analyzing status
         updateData.metadata = {
-          cross_reference_score: result.cross_reference_score,
-          attempt_count: 1,
-          last_recheck: new Date().toISOString()
+          ...existingMetadata,
+          cross_reference: {
+            sources_found: result.matched_articles.map(a => a.source_name || a.news_sources?.name),
+            sources_missing: result.missing_sources,
+            cross_reference_score: result.cross_reference_score,
+            attempt_count: (existingMetadata.cross_reference?.attempt_count || 0) + 1,
+            last_recheck: now,
+            next_recheck_at: result.recheck_scheduled_at,
+            ready_for_synthesis: false
+          }
         }
         break
       case 'insufficient':
-        updateData.processing_status = 'failed'
+        // Don't mark as failed immediately - allow limited source processing
+        updateData.status = 'ready_for_ai'
+        updateData.metadata = {
+          ...existingMetadata,
+          cross_reference: {
+            sources_found: result.matched_articles.map(a => a.source_name || a.news_sources?.name),
+            sources_missing: result.missing_sources,
+            cross_reference_score: result.cross_reference_score,
+            insufficient_sources: true,
+            ready_for_synthesis: result.matched_articles.length >= 2, // Need at least 2 for perspective
+            analysis_completed_at: now
+          }
+        }
         break
     }
 
     await this.supabase
-      .from('story_clusters')
+      .from('topic_clusters')
       .update(updateData)
       .eq('id', clusterId)
+  }
+  
+  // Keep backward compatibility
+  private async updateClusterStatus(clusterId: string, result: CrossReferenceResult) {
+    return this.updateTopicClusterStatus(clusterId, result)
   }
 
   /**
@@ -400,13 +453,19 @@ class CrossReferenceEngine {
 
   private async getDelayedProcessingClusters() {
     const { data } = await this.supabase
-      .from('story_clusters')
+      .from('topic_clusters')
       .select('*')
-      .eq('processing_status', 'detecting')
-      .not('recheck_scheduled_at', 'is', null)
-      .lte('recheck_scheduled_at', new Date().toISOString())
+      .eq('status', 'analyzing')
+      .not('metadata->cross_reference->next_recheck_at', 'is', null)
 
-    return data || []
+    // Filter clusters where recheck time has passed
+    const now = new Date().toISOString()
+    const readyForRecheck = data?.filter(cluster => {
+      const nextRecheck = cluster.metadata?.cross_reference?.next_recheck_at
+      return nextRecheck && nextRecheck <= now
+    }) || []
+
+    return readyForRecheck
   }
 
   private findArticlesMatchingCluster(articles: any[], cluster: any) {
@@ -444,38 +503,65 @@ class CrossReferenceEngine {
       })
   }
 
-  private async markClusterAsExceededAttempts(clusterId: string) {
+  private async markClusterAsReadyWithLimitedSources(clusterId: string) {
+    // In Nonbulla concept, we don't fail clusters - we process them with available sources
+    const now = new Date().toISOString()
+    
+    const { data: cluster } = await this.supabase
+      .from('topic_clusters')
+      .select('metadata')
+      .eq('id', clusterId)
+      .single()
+
+    const existingMetadata = cluster?.metadata || {}
+    
     await this.supabase
-      .from('story_clusters')
+      .from('topic_clusters')
       .update({
-        processing_status: 'failed',
+        status: 'ready_for_ai',
         metadata: { 
-          failure_reason: 'exceeded_max_recheck_attempts',
-          final_attempt_at: new Date().toISOString()
+          ...existingMetadata,
+          cross_reference: {
+            ...existingMetadata.cross_reference,
+            limited_sources: true,
+            max_attempts_reached: true,
+            ready_for_synthesis: true,
+            final_attempt_at: now,
+            synthesis_note: 'Proceeding with available sources for multi-perspective analysis'
+          }
         }
       })
       .eq('id', clusterId)
+  }
+  
+  // Keep backward compatibility  
+  private async markClusterAsExceededAttempts(clusterId: string) {
+    return this.markClusterAsReadyWithLimitedSources(clusterId)
   }
 
   private async scheduleAnotherRecheck(clusterId: string) {
     const nextRecheck = this.calculateRecheckTime(1) // 1 hour from now
     
     const { data: cluster } = await this.supabase
-      .from('story_clusters')
+      .from('topic_clusters')
       .select('metadata')
       .eq('id', clusterId)
       .single()
 
-    const currentAttempts = cluster?.metadata?.attempt_count || 1
+    const existingMetadata = cluster?.metadata || {}
+    const currentAttempts = existingMetadata.cross_reference?.attempt_count || 1
 
     await this.supabase
-      .from('story_clusters')
+      .from('topic_clusters')
       .update({
-        recheck_scheduled_at: nextRecheck,
         metadata: {
-          ...cluster?.metadata,
-          attempt_count: currentAttempts + 1,
-          last_recheck: new Date().toISOString()
+          ...existingMetadata,
+          cross_reference: {
+            ...existingMetadata.cross_reference,
+            attempt_count: currentAttempts + 1,
+            last_recheck: new Date().toISOString(),
+            next_recheck_at: nextRecheck
+          }
         }
       })
       .eq('id', clusterId)

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { rssManager } from '@/lib/rss-parser'
+import { enhancedRSSCrawler } from '@/lib/enhanced-rss-crawler'
+import { crossReferenceEngine } from '@/lib/cross-reference-engine'
 
 export async function GET(request: NextRequest) {
   try {
@@ -18,39 +19,42 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    console.log('🕒 Starting scheduled RSS fetch...')
+    console.log('🕒 Starting Nonbulla enhanced RSS crawl and clustering...')
     
-    const results = await rssManager.fetchAndProcessAllFeeds()
+    // Phase 1: Enhanced RSS crawling with metadata focus and clustering
+    const crawlResults = await enhancedRSSCrawler.performHourlyCrawl()
     
-    console.log('📊 RSS fetch completed:', {
-      totalSources: results.totalSources,
-      successfulSources: results.successfulSources,
-      totalArticles: results.totalArticles,
-      errors: results.errors.length
-    })
+    // Phase 2: Process delayed cross-reference rechecks
+    console.log('🔄 Processing delayed cross-reference rechecks...')
+    const recheckResults = await crossReferenceEngine.processDelayedRechecks()
+    
+    const totalResults = {
+      crawl: crawlResults.crawl_summary,
+      delayed_rechecks: recheckResults,
+      workflow_stage: 'RSS Crawling → Clustering → Cross-Reference Analysis',
+      next_phase: 'AI Perspective Synthesis (separate cron job)'
+    }
+    
+    console.log('🎆 Nonbulla RSS and clustering workflow completed:', totalResults)
     
     return NextResponse.json({
       success: true,
-      message: 'Scheduled RSS fetch completed',
+      message: 'Nonbulla RSS crawl and clustering completed',
       timestamp: new Date().toISOString(),
-      data: {
-        totalSources: results.totalSources,
-        successfulSources: results.successfulSources,
-        totalArticles: results.totalArticles,
-        errors: results.errors,
-        schedule: 'Every 2 hours'
-      }
+      workflow: 'enhanced_metadata_clustering',
+      data: totalResults
     })
 
   } catch (error) {
-    console.error('❌ RSS cron job error:', error)
+    console.error('❌ Nonbulla RSS crawl and clustering error:', error)
     
     return NextResponse.json(
       { 
         success: false, 
-        error: 'Internal server error',
+        error: 'Enhanced RSS crawl failed',
         message: error instanceof Error ? error.message : 'Unknown error',
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        workflow: 'enhanced_metadata_clustering'
       },
       { status: 500 }
     )

@@ -25,24 +25,39 @@ export interface SourceChip {
   position_in_text: number[]
 }
 
-export interface UnifiedArticle {
+export interface SynthesizedArticle {
   title: string
-  unified_content: string
-  perspective_analysis: {
-    common_facts: string[]
-    different_interpretations: string[]
-    bias_analysis: string
-    credibility_assessment: string
+  summary: string
+  full_content: string
+  key_points: string[]
+  different_perspectives: string[]
+  political_balance: {
+    left_perspective: string
+    center_perspective: string  
+    right_perspective: string
+    factual_core: string[]
   }
   source_chips: SourceChip[]
   surprise_ending: string
   notebooklm_summary: string
   source_perspectives_summary: SourcePerspective[]
+  quality_indicators: {
+    source_diversity: number
+    credibility_score: number
+    fact_check_status: 'verified' | 'needs_review' | 'disputed'
+    bias_balance_score: number
+  }
   metadata: {
+    cluster_id: string
     total_sources: number
+    source_count: number
+    total_source_articles: number
     processing_time_ms: number
     ai_model_used: string
     confidence_score: number
+    synthesis_method: 'multi_perspective_ai'
+    geographic_coverage: string[]
+    publish_status: 'draft' | 'review' | 'published'
   }
 }
 
@@ -54,57 +69,73 @@ class AIPerspectiveEngine {
   private openaiModel = 'gpt-4o' // Latest model for best analysis
 
   /**
-   * Main method - analyze story cluster and generate unified article
+   * Main method - synthesize multi-perspective article from topic cluster
+   * Focuses on breaking filter bubbles by showing all perspectives
    */
-  async generateUnifiedArticle(clusterId: string): Promise<UnifiedArticle> {
-    console.log(`🧠 Starting AI perspective analysis for cluster: ${clusterId}`)
+  async generateSynthesizedArticle(clusterId: string): Promise<SynthesizedArticle> {
+    console.log(`🧠 Starting AI multi-perspective synthesis for cluster: ${clusterId}`)
     const startTime = Date.now()
 
-    // Get cluster with cross-referenced articles
-    const cluster = await this.getClusterWithCrossReferencedArticles(clusterId)
-    if (!cluster || cluster.matched_articles.length < 2) {
-      throw new Error(`Cluster ${clusterId} not ready for perspective analysis - need at least 2 sources`)
+    // Get cluster with articles from cross-referenced sources
+    const cluster = await this.getTopicClusterWithArticles(clusterId)
+    if (!cluster || cluster.articles.length < 2) {
+      throw new Error(`Cluster ${clusterId} not ready for synthesis - need at least 2 sources`)
     }
 
-    console.log(`📰 Analyzing ${cluster.matched_articles.length} articles from different sources`)
+    console.log(`📰 Synthesizing ${cluster.articles.length} articles from different perspectives`)
 
-    // Step 1: Analyze each source's perspective
-    const sourcePerspectives = await this.analyzeSourcePerspectives(cluster.matched_articles)
+    // Step 1: Analyze each source's unique perspective  
+    const sourcePerspectives = await this.analyzeSourcePerspectives(cluster.articles)
     
-    // Step 2: Generate unified content with AI
-    const unifiedContent = await this.generateUnifiedContent(cluster, sourcePerspectives)
+    // Step 2: Generate multi-perspective content breaking filter bubbles
+    const synthesizedContent = await this.generateMultiPerspectiveContent(cluster, sourcePerspectives)
     
-    // Step 3: Create source chips for inline references
-    const sourceChips = this.generateSourceChips(sourcePerspectives, unifiedContent.content)
+    // Step 3: Create source chips for transparency
+    const sourceChips = this.generateSourceChips(sourcePerspectives, synthesizedContent.full_content)
     
     // Step 4: Generate "om-denken" surprise ending
     const surpriseEnding = await this.generateSurpriseEnding(cluster, sourcePerspectives)
     
-    // Step 5: Create NotebookLM extended summary
-    const notebooklmSummary = await this.generateNotebookLMSummary(cluster, sourcePerspectives, unifiedContent)
+    // Step 5: Create NotebookLM extended summary for podcast
+    const notebooklmSummary = await this.generateNotebookLMSummary(cluster, sourcePerspectives, synthesizedContent)
 
     const processingTime = Date.now() - startTime
 
-    const result: UnifiedArticle = {
-      title: unifiedContent.title,
-      unified_content: unifiedContent.content,
-      perspective_analysis: unifiedContent.analysis,
+    const result: SynthesizedArticle = {
+      title: synthesizedContent.title,
+      summary: synthesizedContent.summary,
+      full_content: synthesizedContent.full_content,
+      key_points: synthesizedContent.key_points,
+      different_perspectives: synthesizedContent.different_perspectives,
+      political_balance: synthesizedContent.political_balance,
       source_chips: sourceChips,
       surprise_ending: surpriseEnding,
       notebooklm_summary: notebooklmSummary,
       source_perspectives_summary: sourcePerspectives,
+      quality_indicators: {
+        source_diversity: this.calculateSourceDiversity(sourcePerspectives),
+        credibility_score: this.calculateCredibilityScore(sourcePerspectives),
+        fact_check_status: this.determineFactCheckStatus(sourcePerspectives),
+        bias_balance_score: this.calculateBiasBalance(sourcePerspectives)
+      },
       metadata: {
-        total_sources: cluster.matched_articles.length,
+        cluster_id: clusterId,
+        total_sources: cluster.articles.length,
+        source_count: new Set(cluster.articles.map(a => a.source_id)).size,
+        total_source_articles: cluster.articles.length,
         processing_time_ms: processingTime,
         ai_model_used: this.openaiModel,
-        confidence_score: this.calculateConfidenceScore(sourcePerspectives)
+        confidence_score: this.calculateConfidenceScore(sourcePerspectives),
+        synthesis_method: 'multi_perspective_ai',
+        geographic_coverage: this.extractGeographicCoverage(cluster, sourcePerspectives),
+        publish_status: 'draft'
       }
     }
 
-    // Store in database
-    await this.storeUnifiedArticle(clusterId, result)
+    // Store in database using new schema
+    await this.storeSynthesizedArticle(clusterId, result)
 
-    console.log(`✅ Unified article generated in ${processingTime}ms`)
+    console.log(`✅ Multi-perspective article synthesized in ${processingTime}ms`)
     return result
   }
 
@@ -154,26 +185,32 @@ class AIPerspectiveEngine {
   }
 
   /**
-   * Generate unified content with AI
+   * Generate multi-perspective content that breaks filter bubbles
    */
-  private async generateUnifiedContent(cluster: any, perspectives: SourcePerspective[]): Promise<{
+  private async generateMultiPerspectiveContent(cluster: any, perspectives: SourcePerspective[]): Promise<{
     title: string
-    content: string
-    analysis: any
+    summary: string
+    full_content: string
+    key_points: string[]
+    different_perspectives: string[]
+    political_balance: any
   }> {
-    console.log('✍️ Generating unified article content...')
+    console.log('✍️ Generating multi-perspective content to break filter bubbles...')
     
-    const prompt = this.buildUnifiedContentPrompt(cluster, perspectives)
-    const result = await this.callOpenAI(prompt, 'unified-content')
+    const prompt = this.buildMultiPerspectivePrompt(cluster, perspectives)
+    const result = await this.callOpenAI(prompt, 'multi-perspective-synthesis')
     
     return {
-      title: result.title || cluster.primary_topic,
-      content: result.content || '',
-      analysis: {
-        common_facts: result.common_facts || [],
-        different_interpretations: result.different_interpretations || [],
-        bias_analysis: result.bias_analysis || '',
-        credibility_assessment: result.credibility_assessment || ''
+      title: result.title || cluster.title,
+      summary: result.summary || '',
+      full_content: result.full_content || '',
+      key_points: result.key_points || [],
+      different_perspectives: result.different_perspectives || [],
+      political_balance: {
+        left_perspective: result.political_balance?.left_perspective || '',
+        center_perspective: result.political_balance?.center_perspective || '',
+        right_perspective: result.political_balance?.right_perspective || '',
+        factual_core: result.political_balance?.factual_core || []
       }
     }
   }
@@ -270,46 +307,58 @@ Antwoord in JSON format:
   }
 
   /**
-   * Build unified content generation prompt
+   * Build multi-perspective content prompt focused on breaking filter bubbles
    */
-  private buildUnifiedContentPrompt(cluster: any, perspectives: SourcePerspective[]): string {
+  private buildMultiPerspectivePrompt(cluster: any, perspectives: SourcePerspective[]): string {
     return `
-Je bent een ervaren Nederlandse journalist die multi-perspectief artikelen schrijft voor Nonbulla - een platform dat nieuwsbubbels doorbreekt.
+Je bent een expert Nederlandse journalist die werkt voor Nonbulla - het platform dat nieuwsbubbels doorbreekt door alle perspectieven te tonen.
 
-ONDERWERP: ${cluster.primary_topic}
+JOUW MISSIE: Schrijf een artikel dat lezers uit hun filterbubbel haalt door ALLE kanten van het verhaal te belichten.
+
+ONDERWERP: ${cluster.title}
+CATEGORIE: ${cluster.metadata?.nonbulla_category || 'Alles'}
 KEYWORDS: ${cluster.keywords?.join(', ')}
+TIJDSPERIODE: ${cluster.time_period_start} tot ${cluster.time_period_end}
 
-PERSPECTIVEN VAN VERSCHILLENDE BRONNEN:
+PERSPECTIEVEN VAN VERSCHILLENDE BRONNEN:
 ${perspectives.map(p => `
-🔹 ${p.source_name} (${p.political_leaning_detected}):
-   Invalshoek: ${p.key_angle}
-   Unieke details: ${p.unique_details.join(', ')}
-   Perspectief: ${p.perspective_summary}
-   Citaten: ${p.quote_extracts.join(' | ')}
+🔹 ${p.source_name} (${p.political_leaning_detected}, credibiliteit: ${p.credibility_assessment}%):
+   Unieke invalshoek: ${p.key_angle}
+   Specifieke details: ${p.unique_details.join(', ')}
+   Standpunt samenvatting: ${p.perspective_summary}
+   Belangrijke citaten: ${p.quote_extracts.join(' | ')}
+   Nadruk gebieden: ${p.emphasis_areas.join(', ')}
 `).join('\n')}
 
-SCHRIJF EEN GEBALANCEERD NIEUWSARTIKEL DAT:
-1. Alle belangrijke feiten bevat van alle bronnen
-2. De verschillende perspectieven helder maakt zonder oordeel
-3. Verschillen in interpretatie benoemt op een plezierige manier
-4. Neutraal blijft maar wel nuances erkent
-5. Goed leesbaar is voor Nederlandse lezers
-6. 400-600 woorden lang is
+SCHRIJF EEN MULTI-PERSPECTIEF ARTIKEL DAT:
+1. EXPLICIET alle verschillende standpunten presenteert
+2. Laat zien waar bronnen het eens én oneens zijn
+3. Politieke nuances respecteert zonder partij te kiezen
+4. Feiten scheidt van interpretaties
+5. De lezer uitnodigt om zelf na te denken
+6. 600-800 woorden, toegankelijk voor alle Nederlanders
+7. Transparant is over bronnen en hun achtergrond
 
-ANALYSEER OOK:
-- Gemeenschappelijke feiten tussen bronnen
-- Verschillende interpretaties van dezelfde feiten  
-- Bias patronen die je detecteert
-- Kredibiliteitsbeoordeling van de verschillende standpunten
+INCLUDEER:
+- Korte samenvatting (2-3 zinnen)
+- Kernpunten die iedereen erkent
+- Verschillende interpretaties per politiek spectrum
+- Wat elke kant goed/belangrijk vindt
+- Waarom dit verhaal belangrijk is voor Nederland
 
 Antwoord in JSON format:
 {
-  "title": "Pakkende titel die de kern van het verhaal weergeeft",
-  "content": "Volledige artikel tekst in vlotte Nederlandse journalistieke stijl",
-  "common_facts": ["feit1", "feit2", "feit3"],
-  "different_interpretations": ["interpretatie1", "interpretatie2"],
-  "bias_analysis": "Analyse van detecteerbare bias patronen",
-  "credibility_assessment": "Beoordeling van de verschillende standpunten"
+  "title": "Neutrale titel die de kern weergeeft",
+  "summary": "2-3 zinnen kernpunt samenvatting",
+  "full_content": "Volledige artikel met alle perspectieven",
+  "key_points": ["kernpunt1", "kernpunt2", "kernpunt3"],
+  "different_perspectives": ["perspectief1", "perspectief2", "perspectief3"],
+  "political_balance": {
+    "left_perspective": "Wat linkse bronnen benadrukken",
+    "center_perspective": "Wat centristische bronnen zeggen", 
+    "right_perspective": "Wat rechtse bronnen benadrukken",
+    "factual_core": ["feit1", "feit2", "feit3"]
+  }
 }
 `
   }
@@ -435,37 +484,49 @@ Antwoord in JSON format:
   }
 
   /**
-   * Helper methods
+   * Helper methods for new database schema
    */
-  private async getClusterWithCrossReferencedArticles(clusterId: string) {
+  private async getTopicClusterWithArticles(clusterId: string) {
     const { data: cluster } = await this.supabase
-      .from('story_clusters')
+      .from('topic_clusters')
       .select('*')
       .eq('id', clusterId)
-      .eq('processing_status', 'analyzing')
+      .in('status', ['analyzing', 'ready_for_ai'])
       .single()
 
     if (!cluster) return null
 
-    // Get articles from sources found by cross-reference engine
-    const { data: articles } = await this.supabase
-      .from('raw_articles')
+    // Get articles linked to this cluster
+    const { data: clusterArticles } = await this.supabase
+      .from('cluster_articles')
       .select(`
-        *,
-        news_sources (
-          name,
-          credibility_score,
-          political_leaning,
-          metadata
+        relevance_score,
+        is_primary,
+        raw_articles!inner (
+          *,
+          news_sources!inner (
+            name,
+            credibility_score,
+            political_leaning,
+            metadata
+          )
         )
       `)
-      .in('source_id', cluster.sources_found || [])
-      .gte('published_at', new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString())
-      .order('quality_score', { ascending: false })
+      .eq('cluster_id', clusterId)
+      .order('relevance_score', { ascending: false })
+
+    const articles = clusterArticles?.map(ca => ({
+      ...ca.raw_articles,
+      relevance_score: ca.relevance_score,
+      is_primary: ca.is_primary,
+      source_name: ca.raw_articles.news_sources?.name,
+      source_credibility: ca.raw_articles.news_sources?.credibility_score,
+      source_political_leaning: ca.raw_articles.news_sources?.political_leaning
+    })) || []
 
     return {
       ...cluster,
-      matched_articles: articles || []
+      articles
     }
   }
 
@@ -508,72 +569,173 @@ Antwoord in JSON format:
     return positions
   }
 
+  // Enhanced quality and diversity metrics for filter bubble breaking
+  
+  private calculateSourceDiversity(perspectives: SourcePerspective[]): number {
+    const leanings = new Set(perspectives.map(p => p.political_leaning_detected))
+    const sources = new Set(perspectives.map(p => p.source_name))
+    
+    return Math.min(1, (leanings.size / 3) * 0.6 + (sources.size / perspectives.length) * 0.4)
+  }
+  
+  private calculateCredibilityScore(perspectives: SourcePerspective[]): number {
+    const avgCredibility = perspectives.reduce((sum, p) => sum + p.credibility_assessment, 0) / perspectives.length
+    return avgCredibility / 100
+  }
+  
+  private determineFactCheckStatus(perspectives: SourcePerspective[]): 'verified' | 'needs_review' | 'disputed' {
+    const avgCredibility = this.calculateCredibilityScore(perspectives) * 100
+    const sourceDiversity = this.calculateSourceDiversity(perspectives)
+    
+    if (avgCredibility > 80 && sourceDiversity > 0.7) return 'verified'
+    if (avgCredibility > 60 && sourceDiversity > 0.5) return 'needs_review'
+    return 'disputed'
+  }
+  
+  private calculateBiasBalance(perspectives: SourcePerspective[]): number {
+    const leanings = perspectives.map(p => p.political_leaning_detected)
+    const leftCount = leanings.filter(l => l.includes('left')).length
+    const rightCount = leanings.filter(l => l.includes('right')).length
+    const centerCount = leanings.filter(l => l === 'center').length
+    
+    const total = perspectives.length
+    const balance = 1 - Math.abs(leftCount - rightCount) / total
+    const centerBonus = centerCount / total * 0.2
+    
+    return Math.min(1, balance + centerBonus)
+  }
+  
   private calculateConfidenceScore(perspectives: SourcePerspective[]): number {
     if (perspectives.length === 0) return 0
     
-    const avgCredibility = perspectives.reduce((sum, p) => sum + p.credibility_assessment, 0) / perspectives.length
-    const diversityScore = perspectives.length >= 3 ? 0.9 : 0.7
+    const credibilityScore = this.calculateCredibilityScore(perspectives)
+    const diversityScore = this.calculateSourceDiversity(perspectives)
+    const biasBalance = this.calculateBiasBalance(perspectives)
     
-    return Math.min(0.95, (avgCredibility / 100) * diversityScore)
+    return credibilityScore * 0.4 + diversityScore * 0.4 + biasBalance * 0.2
+  }
+  
+  private extractGeographicCoverage(cluster: any, perspectives: SourcePerspective[]): string[] {
+    const coverage = ['Nederland'] // Default
+    
+    const allText = perspectives.map(p => 
+      p.perspective_summary + ' ' + p.unique_details.join(' ')
+    ).join(' ').toLowerCase()
+    
+    if (allText.includes('europa') || allText.includes('eu')) coverage.push('Europa')
+    if (allText.includes('wereldwijd') || allText.includes('international')) coverage.push('Wereldwijd')
+    if (allText.includes('amerika') || allText.includes('vs')) coverage.push('Noord-Amerika')
+    
+    return coverage
+  }
+  
+  private mapPoliticalLeaningToStance(leaning: string): string {
+    const mapping: { [key: string]: string } = {
+      'left': 'progressief',
+      'center-left': 'centrum-progressief',
+      'center': 'neutraal',
+      'center-right': 'centrum-conservatief', 
+      'right': 'conservatief'
+    }
+    return mapping[leaning] || 'onbekend'
   }
 
-  private async storeUnifiedArticle(clusterId: string, article: UnifiedArticle) {
+  private async storeSynthesizedArticle(clusterId: string, article: SynthesizedArticle) {
     try {
-      // Store unified article
-      const { data: unifiedArticle, error: articleError } = await this.supabase
-        .from('unified_articles')
+      // Store synthesized article using new schema
+      const { data: synthesizedArticle, error: articleError } = await this.supabase
+        .from('synthesized_articles')
         .insert({
           cluster_id: clusterId,
           title: article.title,
-          unified_content: article.unified_content,
-          perspective_analysis: article.perspective_analysis,
-          source_chips: article.source_chips,
-          surprise_ending: article.surprise_ending,
-          notebooklm_summary: article.notebooklm_summary,
-          ai_model_used: article.metadata.ai_model_used,
-          generation_timestamp: new Date().toISOString(),
-          status: 'draft',
-          metadata: article.metadata
+          summary: article.summary,
+          full_content: article.full_content,
+          key_points: article.key_points,
+          different_perspectives: article.different_perspectives,
+          political_balance: article.political_balance,
+          source_count: article.metadata.source_count,
+          total_source_articles: article.metadata.total_source_articles,
+          credibility_score: article.quality_indicators.credibility_score,
+          fact_check_status: article.quality_indicators.fact_check_status,
+          geographic_coverage: article.metadata.geographic_coverage,
+          synthesis_method: article.metadata.synthesis_method,
+          publish_status: article.metadata.publish_status,
+          quality_indicators: article.quality_indicators,
+          metadata: {
+            ai_model_used: article.metadata.ai_model_used,
+            processing_time_ms: article.metadata.processing_time_ms,
+            confidence_score: article.metadata.confidence_score,
+            source_chips: article.source_chips,
+            surprise_ending: article.surprise_ending,
+            notebooklm_summary: article.notebooklm_summary
+          }
         })
         .select()
         .single()
 
       if (articleError) throw articleError
 
-      // Store source perspectives
+      // Store source perspectives with enhanced metadata
       for (const perspective of article.source_perspectives_summary) {
-        await this.supabase
-          .from('source_perspectives')
-          .insert({
-            cluster_id: clusterId,
-            source_name: perspective.source_name,
-            original_article_url: perspective.source_url,
-            original_title: perspective.original_title,
-            key_angle: perspective.key_angle,
-            unique_details: perspective.unique_details,
-            sentiment_score: perspective.sentiment_score,
-            political_leaning_detected: perspective.political_leaning_detected,
-            credibility_assessment: perspective.credibility_assessment,
-            perspective_summary: perspective.perspective_summary,
-            quote_extracts: perspective.quote_extracts
-          })
+        // Find the corresponding article ID
+        const { data: sourceArticle } = await this.supabase
+          .from('raw_articles')
+          .select('id, source_id')
+          .eq('url', perspective.source_url)
+          .single()
+
+        if (sourceArticle) {
+          await this.supabase
+            .from('source_perspectives')
+            .insert({
+              cluster_id: clusterId,
+              article_id: sourceArticle.id,
+              source_id: sourceArticle.source_id,
+              perspective_summary: perspective.perspective_summary,
+              key_quotes: perspective.quote_extracts,
+              unique_angles: perspective.unique_details,
+              emphasis_topics: perspective.emphasis_areas,
+              stance: this.mapPoliticalLeaningToStance(perspective.political_leaning_detected),
+              source_credibility_weight: perspective.credibility_assessment / 100,
+              relevance_score: 0.8, // Default high relevance for synthesized articles
+              bias_indicators: {
+                political_leaning: perspective.political_leaning_detected,
+                sentiment_score: perspective.sentiment_score,
+                key_angle: perspective.key_angle
+              }
+            })
+        }
       }
 
-      // Update cluster status
+      // Update cluster status to synthesized
       await this.supabase
-        .from('story_clusters')
+        .from('topic_clusters')
         .update({ 
-          processing_status: 'complete',
-          unified_article_id: unifiedArticle.id
+          status: 'synthesized',
+          metadata: {
+            synthesized_article_id: synthesizedArticle.id,
+            synthesis_completed_at: new Date().toISOString()
+          }
         })
         .eq('id', clusterId)
 
-      console.log(`💾 Stored unified article: "${article.title}"`)
+      console.log(`💾 Stored synthesized article: "${article.title}"`)
+      return synthesizedArticle
 
     } catch (error) {
-      console.error('Error storing unified article:', error)
+      console.error('Error storing synthesized article:', error)
       throw error
     }
+  }
+}
+
+// Update method name for the new workflow
+export class AIPerspectiveEngine {
+  // ... (existing methods)
+  
+  // Keep backward compatibility
+  async generateUnifiedArticle(clusterId: string) {
+    return this.generateSynthesizedArticle(clusterId)
   }
 }
 

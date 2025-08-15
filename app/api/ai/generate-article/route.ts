@@ -30,32 +30,19 @@ export async function POST(request: NextRequest) {
         message: 'AI multi-perspective article synthesized successfully - breaking filter bubbles!',
         data: {
           cluster_id: cluster_id,
-          article_id: result.metadata.cluster_id,
+          article_id: Date.now().toString(),
           title: result.title,
-          summary_length: result.summary.length,
-          full_content_length: result.full_content.length,
-          key_points_count: result.key_points.length,
-          perspectives_count: result.different_perspectives.length,
-          sources_analyzed: result.metadata.total_sources,
-          source_diversity: result.quality_indicators.source_diversity,
-          credibility_score: result.quality_indicators.credibility_score,
-          bias_balance_score: result.quality_indicators.bias_balance_score,
-          fact_check_status: result.quality_indicators.fact_check_status,
-          processing_time_ms: result.metadata.processing_time_ms,
-          api_duration_ms: duration,
-          ai_model_used: result.metadata.ai_model_used,
-          confidence_score: result.metadata.confidence_score,
+          content_length: result.unified_content.length,
+          notebooklm_summary_length: result.notebooklm_summary.length,
           source_chips_count: result.source_chips.length,
+          perspectives_count: result.source_perspectives_summary.length,
+          sources_analyzed: result.metadata.total_sources,
+          processing_time_ms: result.metadata.processing_time_ms,
+          confidence_score: result.metadata.confidence_score,
+          ai_model_used: result.metadata.ai_model_used,
+          api_duration_ms: duration,
           has_surprise_ending: !!result.surprise_ending,
           notebooklm_ready: !!result.notebooklm_summary,
-          political_balance: {
-            has_left_perspective: !!result.political_balance.left_perspective,
-            has_center_perspective: !!result.political_balance.center_perspective,
-            has_right_perspective: !!result.political_balance.right_perspective,
-            factual_core_count: result.political_balance.factual_core.length
-          },
-          geographic_coverage: result.metadata.geographic_coverage,
-          synthesis_method: result.metadata.synthesis_method,
           generation_timestamp: new Date().toISOString()
         }
       })
@@ -99,9 +86,7 @@ export async function POST(request: NextRequest) {
             title: article.title,
             sources: article.metadata.total_sources,
             confidence: article.metadata.confidence_score,
-            perspectives: article.different_perspectives.length,
-            bias_balance: article.quality_indicators.bias_balance_score,
-            credibility: article.quality_indicators.credibility_score,
+            perspectives: article.source_perspectives_summary.length,
             filter_bubble_breaking: true
           })
           console.log(`✅ Synthesized multi-perspective article: "${article.title}"`)
@@ -244,9 +229,7 @@ export async function GET(request: NextRequest) {
             title: article.title,
             sources: article.metadata.total_sources,
             confidence: article.metadata.confidence_score,
-            perspectives: article.different_perspectives.length,
-            bias_balance: article.quality_indicators.bias_balance_score,
-            credibility: article.quality_indicators.credibility_score,
+            perspectives: article.source_perspectives_summary.length,
             filter_bubble_breaking: true
           })
           console.log(`✅ Synthesized multi-perspective article: "${article.title}"`)
