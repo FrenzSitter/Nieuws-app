@@ -119,12 +119,10 @@ export async function getCachedBatch<T>(
   
   if (!redis) {
     // No Redis, execute all fallbacks
-    for (const key of fallbacks.keys()) {
-      const fallback = fallbacks.get(key)
-    if (fallback) {
+    const fallbackEntries = Array.from(fallbacks.entries())
+    for (const [key, fallback] of fallbackEntries) {
     results.set(key, await fallback())
   }
-}
     return results
   }
 
@@ -148,10 +146,9 @@ export async function getCachedBatch<T>(
           results.set(key, data)
           
           // Store in cache
-          if (data !== null && data !== undefined) {
-            await redis.set(key, JSON.stringify(data), {
-              ex: ttl || CACHE_TTL.ARTICLES_LIST
-            })
+          const fallbackEntries = Array.from(fallbacks.entries())
+            for (const [key, fallback] of fallbackEntries) {
+            results.set(key, await fallback())
           }
         }
       }
