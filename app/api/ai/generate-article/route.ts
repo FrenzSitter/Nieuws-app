@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
     const { cluster_id, action } = body
 
     if (action === 'generate' && cluster_id) {
-      console.log(`🧠 Starting AI article generation for cluster: ${cluster_id}`)
+      console.log(`🧠 Starting AI multi-perspective synthesis for cluster: ${cluster_id}`)
       
       const startTime = Date.now()
       const result = await aiPerspectiveEngineClaude.generateUnifiedArticle(cluster_id)
@@ -27,13 +27,20 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        message: 'AI unified article generated successfully',
+        message: 'AI multi-perspective article synthesized successfully - breaking filter bubbles!',
         data: {
           cluster_id: cluster_id,
-          article_id: result.title, // Will be proper ID from database
+          article_id: result.metadata.cluster_id,
           title: result.title,
-          content_length: result.unified_content.length,
+          summary_length: result.summary.length,
+          full_content_length: result.full_content.length,
+          key_points_count: result.key_points.length,
+          perspectives_count: result.different_perspectives.length,
           sources_analyzed: result.metadata.total_sources,
+          source_diversity: result.quality_indicators.source_diversity,
+          credibility_score: result.quality_indicators.credibility_score,
+          bias_balance_score: result.quality_indicators.bias_balance_score,
+          fact_check_status: result.quality_indicators.fact_check_status,
           processing_time_ms: result.metadata.processing_time_ms,
           api_duration_ms: duration,
           ai_model_used: result.metadata.ai_model_used,
@@ -41,34 +48,37 @@ export async function POST(request: NextRequest) {
           source_chips_count: result.source_chips.length,
           has_surprise_ending: !!result.surprise_ending,
           notebooklm_ready: !!result.notebooklm_summary,
-          perspective_analysis: {
-            common_facts_count: result.perspective_analysis.common_facts.length,
-            different_interpretations_count: result.perspective_analysis.different_interpretations.length,
-            has_bias_analysis: !!result.perspective_analysis.bias_analysis
+          political_balance: {
+            has_left_perspective: !!result.political_balance.left_perspective,
+            has_center_perspective: !!result.political_balance.center_perspective,
+            has_right_perspective: !!result.political_balance.right_perspective,
+            factual_core_count: result.political_balance.factual_core.length
           },
+          geographic_coverage: result.metadata.geographic_coverage,
+          synthesis_method: result.metadata.synthesis_method,
           generation_timestamp: new Date().toISOString()
         }
       })
     }
 
     if (action === 'batch_generate') {
-      console.log('🚀 Starting batch AI article generation...')
+      console.log('🚀 Starting batch AI multi-perspective synthesis...')
       
-      // Get all clusters ready for processing
+      // Get all clusters ready for AI synthesis
       const { createClient } = await import('@/lib/supabase/client')
       const supabase = createClient()
 
       const { data: readyClusters } = await supabase
-        .from('story_clusters')
-        .select('id, primary_topic')
-        .eq('processing_status', 'analyzing')
-        .order('detection_timestamp', { ascending: false })
+        .from('topic_clusters')
+        .select('id, title')
+        .eq('status', 'ready_for_ai')
+        .order('created_at', { ascending: false })
         .limit(10)
 
       if (!readyClusters || readyClusters.length === 0) {
         return NextResponse.json({
           success: true,
-          message: 'No clusters ready for AI processing',
+          message: 'No topic clusters ready for AI synthesis',
           data: { processed: 0, generated: 0 }
         })
       }
@@ -88,18 +98,22 @@ export async function POST(request: NextRequest) {
             cluster_id: cluster.id,
             title: article.title,
             sources: article.metadata.total_sources,
-            confidence: article.metadata.confidence_score
+            confidence: article.metadata.confidence_score,
+            perspectives: article.different_perspectives.length,
+            bias_balance: article.quality_indicators.bias_balance_score,
+            credibility: article.quality_indicators.credibility_score,
+            filter_bubble_breaking: true
           })
-          console.log(`✅ Generated: "${article.title}"`)
+          console.log(`✅ Synthesized multi-perspective article: "${article.title}"`)
         } catch (error) {
           results.failed++
-          console.error(`❌ Failed to generate article for cluster ${cluster.id}:`, error)
+          console.error(`❌ Failed to synthesize article for cluster ${cluster.id}:`, error)
         }
       }
 
       return NextResponse.json({
         success: true,
-        message: 'Batch AI article generation completed',
+        message: 'Batch AI multi-perspective synthesis completed',
         data: results
       })
     }
@@ -110,12 +124,12 @@ export async function POST(request: NextRequest) {
     )
 
   } catch (error) {
-    console.error('AI article generation API error:', error)
+    console.error('AI multi-perspective synthesis API error:', error)
     
     return NextResponse.json(
       { 
         success: false, 
-        error: 'AI article generation failed',
+        error: 'AI multi-perspective synthesis failed',
         message: error instanceof Error ? error.message : 'Unknown error',
         details: error instanceof Error ? error.stack : undefined
       },
@@ -134,49 +148,50 @@ export async function GET(request: NextRequest) {
       const { createClient } = await import('@/lib/supabase/client')
       const supabase = createClient()
 
-      // Get unified articles statistics
-      const { data: unifiedStats } = await supabase
-        .from('unified_articles')
-        .select('status, ai_model_used, generation_timestamp, metadata')
+      // Get synthesized articles statistics
+      const { data: synthesizedStats } = await supabase
+        .from('synthesized_articles')
+        .select('publish_status, metadata, created_at')
 
       // Get clusters ready for processing
       const { data: readyClusters } = await supabase
-        .from('story_clusters')
+        .from('topic_clusters')
         .select('id')
-        .eq('processing_status', 'analyzing')
+        .eq('status', 'ready_for_ai')
 
       const stats = {
-        total_unified_articles: unifiedStats?.length || 0,
+        total_synthesized_articles: synthesizedStats?.length || 0,
         articles_by_status: {
-          draft: unifiedStats?.filter(a => a.status === 'draft').length || 0,
-          review: unifiedStats?.filter(a => a.status === 'review').length || 0,
-          published: unifiedStats?.filter(a => a.status === 'published').length || 0,
-          archived: unifiedStats?.filter(a => a.status === 'archived').length || 0
+          draft: synthesizedStats?.filter(a => a.publish_status === 'draft').length || 0,
+          review: synthesizedStats?.filter(a => a.publish_status === 'review').length || 0,
+          published: synthesizedStats?.filter(a => a.publish_status === 'published').length || 0
         },
         clusters_ready_for_ai: readyClusters?.length || 0,
         ai_model_in_use: 'claude-3-opus',
         anthropic_api_configured: !!process.env.ANTHROPIC_API_KEY,
         openai_api_configured: !!process.env.OPENAI_API_KEY,
-        avg_confidence_score: (unifiedStats && unifiedStats.length > 0) 
-          ? (unifiedStats.reduce((sum, a) => sum + (a.metadata?.confidence_score || 0), 0) / unifiedStats.length).toFixed(3)
+        avg_confidence_score: (synthesizedStats && synthesizedStats.length > 0) 
+          ? (synthesizedStats.reduce((sum, a) => sum + (a.metadata?.confidence_score || 0), 0) / synthesizedStats.length).toFixed(3)
           : 0,
-        recent_generation_count: unifiedStats?.filter(a => 
-          new Date(a.generation_timestamp) > new Date(Date.now() - 24 * 60 * 60 * 1000)
+        recent_synthesis_count: synthesizedStats?.filter(a => 
+          new Date(a.created_at) > new Date(Date.now() - 24 * 60 * 60 * 1000)
         ).length || 0
       }
 
       return NextResponse.json({
         success: true,
-        message: 'AI Perspective Engine status',
+        message: 'AI Multi-Perspective Synthesis Engine status',
         data: {
           stats,
           features: {
-            perspective_analysis: true,
+            filter_bubble_breaking: true,
+            multi_perspective_synthesis: true,
+            political_balance_analysis: true,
             source_chips: true,
             surprise_endings: true,
             notebooklm_integration: true,
             bias_detection: true,
-            multi_source_synthesis: true
+            credibility_scoring: true
           },
           requirements: {
             minimum_sources: 2,
@@ -192,23 +207,23 @@ export async function GET(request: NextRequest) {
 
     if (action === 'batch_generate') {
       // Handle batch generation via GET for Vercel cron jobs
-      console.log('🚀 Starting batch AI article generation via cron...')
+      console.log('🚀 Starting batch AI multi-perspective synthesis via cron...')
       
-      // Get all clusters ready for processing
+      // Get all clusters ready for AI synthesis
       const { createClient } = await import('@/lib/supabase/client')
       const supabase = createClient()
 
       const { data: readyClusters } = await supabase
-        .from('story_clusters')
-        .select('id, primary_topic')
-        .eq('processing_status', 'analyzing')
-        .order('detection_timestamp', { ascending: false })
+        .from('topic_clusters')
+        .select('id, title')
+        .eq('status', 'ready_for_ai')
+        .order('created_at', { ascending: false })
         .limit(10)
 
       if (!readyClusters || readyClusters.length === 0) {
         return NextResponse.json({
           success: true,
-          message: 'No clusters ready for AI processing',
+          message: 'No topic clusters ready for AI synthesis',
           data: { processed: 0, generated: 0 }
         })
       }
@@ -228,60 +243,67 @@ export async function GET(request: NextRequest) {
             cluster_id: cluster.id,
             title: article.title,
             sources: article.metadata.total_sources,
-            confidence: article.metadata.confidence_score
+            confidence: article.metadata.confidence_score,
+            perspectives: article.different_perspectives.length,
+            bias_balance: article.quality_indicators.bias_balance_score,
+            credibility: article.quality_indicators.credibility_score,
+            filter_bubble_breaking: true
           })
-          console.log(`✅ Generated: "${article.title}"`)
+          console.log(`✅ Synthesized multi-perspective article: "${article.title}"`)
         } catch (error) {
           results.failed++
-          console.error(`❌ Failed to generate article for cluster ${cluster.id}:`, error)
+          console.error(`❌ Failed to synthesize article for cluster ${cluster.id}:`, error)
         }
       }
 
       return NextResponse.json({
         success: true,
-        message: 'Batch AI article generation completed via cron',
+        message: 'Batch AI multi-perspective synthesis completed via cron',
         data: results
       })
     }
 
     if (action === 'recent') {
-      // Get recent unified articles
+      // Get recent synthesized articles
       const { createClient } = await import('@/lib/supabase/client')
       const supabase = createClient()
 
       const limit = parseInt(searchParams.get('limit') || '10', 10)
 
       const { data: recentArticles } = await supabase
-        .from('unified_articles')
+        .from('synthesized_articles')
         .select(`
           id,
           title,
-          status,
-          generation_timestamp,
+          publish_status,
+          created_at,
           metadata,
-          source_chips,
+          source_count,
+          credibility_score,
           cluster_id,
-          story_clusters!inner (
-            primary_topic,
-            sources_found
+          topic_clusters!inner (
+            title,
+            keywords
           )
         `)
-        .order('generation_timestamp', { ascending: false })
+        .order('created_at', { ascending: false })
         .limit(limit)
 
       return NextResponse.json({
         success: true,
-        message: 'Recent unified articles',
+        message: 'Recent synthesized articles',
         data: {
           articles: recentArticles?.map(article => ({
             id: article.id,
             title: article.title,
-            status: article.status,
-            sources_count: Array.isArray((article.story_clusters as any)?.sources_found) ? (article.story_clusters as any).sources_found.length : 0,
+            status: article.publish_status,
+            sources_count: article.source_count || 0,
             confidence_score: article.metadata?.confidence_score || 0,
-            source_chips_count: Array.isArray(article.source_chips) ? article.source_chips.length : 0,
-            generated_at: article.generation_timestamp,
-            topic: (article.story_clusters as any)?.primary_topic
+            credibility_score: article.credibility_score || 0,
+            source_chips_count: Array.isArray(article.metadata?.source_chips) ? article.metadata.source_chips.length : 0,
+            generated_at: article.created_at,
+            topic: (article.topic_clusters as any)?.title,
+            keywords: (article.topic_clusters as any)?.keywords || []
           })) || [],
           total_count: recentArticles?.length || 0
         }
@@ -294,12 +316,12 @@ export async function GET(request: NextRequest) {
     )
 
   } catch (error) {
-    console.error('AI article generation status API error:', error)
+    console.error('AI multi-perspective synthesis status API error:', error)
     
     return NextResponse.json(
       { 
         success: false, 
-        error: 'Failed to get AI generation status',
+        error: 'Failed to get AI synthesis status',
         message: error instanceof Error ? error.message : 'Unknown error'
       },
       { status: 500 }

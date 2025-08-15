@@ -3,27 +3,23 @@
   "crons": [
     {
       "path": "/api/rss/cron",
-      "schedule": "0 */1 * * *"
-    },
-    {
-      "path": "/api/crawler/enhanced",
-      "schedule": "*/30 * * * *"
+      "schedule": "5 */1 * * *"
     },
     {
       "path": "/api/cross-reference/analyze?action=process_delayed",
-      "schedule": "*/10 * * * *"
+      "schedule": "25 */1 * * *"
     },
     {
       "path": "/api/ai/generate-article?action=batch_generate",
-      "schedule": "*/20 * * * *"
+      "schedule": "45 */1 * * *"
     },
     {
       "path": "/api/monitoring/performance?action=cleanup",
-      "schedule": "0 2 * * *"
+      "schedule": "0 3 * * *"
     },
     {
-      "path": "/api/webhooks/article-updates?action=health_check",
-      "schedule": "*/5 * * * *"
+      "path": "/api/monitoring/performance?action=health_check",
+      "schedule": "*/15 * * * *"
     }
   ],
   "headers": [

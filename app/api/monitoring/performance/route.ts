@@ -6,8 +6,20 @@ import { jobQueue } from '@/lib/queue/job-queue'
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
+    const action = searchParams.get('action') || 'metrics'
     const timeframe = searchParams.get('timeframe') || '24h'
     
+    // Handle cleanup action for cron jobs
+    if (action === 'cleanup') {
+      return await handleCleanupAction()
+    }
+    
+    // Handle health check action
+    if (action === 'health_check') {
+      return await handleHealthCheckAction()
+    }
+    
+    // Default metrics action
     // Check cache first
     const cacheKey = `performance:${timeframe}`
     const cachedMetrics = await cacheManager.get<any>(cacheKey)
@@ -313,6 +325,198 @@ function generatePerformanceRecommendations(metrics: any) {
   }
 
   return recommendations
+}
+
+async function handleCleanupAction() {
+  try {
+    console.log('🧹 Starting system cleanup...')
+    const supabase = createServiceClient()
+    const cleanupResults = {
+      cache_cleared: 0,
+      old_logs_removed: 0,
+      temp_data_cleared: 0,
+      queue_jobs_cleaned: 0
+    }
+
+    // 1. Clear old performance cache entries
+    try {
+      if (cacheManager.redis) {
+        // Clear old performance metrics caches (older than 1 hour)
+        await cacheManager.invalidate('performance:*')
+        cleanupResults.cache_cleared++
+      }
+    } catch (error) {
+      console.warn('Cache cleanup failed:', error)
+    }
+
+    // 2. Clean old RSS fetch logs (older than 7 days)
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+    const { count: logsDeleted } = await supabase
+      .from('rss_fetch_logs')
+      .delete()
+      .lt('created_at', sevenDaysAgo.toISOString())
+    cleanupResults.old_logs_removed = logsDeleted || 0
+
+    // 3. Clean old monitoring alerts (resolved, older than 30 days)
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+    const { count: alertsDeleted } = await supabase
+      .from('rss_monitoring_alerts')
+      .delete()
+      .eq('is_resolved', true)
+      .lt('created_at', thirtyDaysAgo.toISOString())
+    cleanupResults.temp_data_cleared = alertsDeleted || 0
+
+    // 4. Clean failed job queue entries (older than 1 day)
+    try {
+      const cleanedJobs = await jobQueue.cleanFailedJobs(24 * 60 * 60 * 1000) // 24 hours
+      cleanupResults.queue_jobs_cleaned = cleanedJobs
+    } catch (error) {
+      console.warn('Job queue cleanup failed:', error)
+    }
+
+    console.log('🧹 System cleanup completed:', cleanupResults)
+    
+    return NextResponse.json({
+      success: true,
+      message: 'System cleanup completed successfully',
+      data: {
+        ...cleanupResults,
+        cleanup_timestamp: new Date().toISOString(),
+        next_cleanup: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // Next day
+      }
+    })
+
+  } catch (error) {
+    console.error('❌ System cleanup failed:', error)
+    return NextResponse.json(
+      { 
+        success: false, 
+        error: 'System cleanup failed',
+        message: error instanceof Error ? error.message : 'Unknown error'
+      },
+      { status: 500 }
+    )
+  }
+}
+
+async function handleHealthCheckAction() {
+  try {
+    console.log('🏥 Performing system health check...')
+    const healthStatus = {
+      overall: 'healthy' as 'healthy' | 'degraded' | 'unhealthy',
+      components: {
+        database: { status: 'unknown', response_time_ms: 0 },
+        redis: { status: 'unknown', connected: false },
+        job_queue: { status: 'unknown', pending_jobs: 0 },
+        ai_apis: { anthropic: false, openai: false }
+      },
+      alerts: [] as any[],
+      timestamp: new Date().toISOString()
+    }
+
+    // 1. Database health check
+    const dbStart = Date.now()
+    try {
+      const supabase = createServiceClient()
+      await supabase.from('raw_articles').select('id').limit(1).single()
+      healthStatus.components.database.status = 'healthy'
+      healthStatus.components.database.response_time_ms = Date.now() - dbStart
+    } catch (error) {
+      healthStatus.components.database.status = 'unhealthy'
+      healthStatus.alerts.push({
+        component: 'database',
+        message: 'Database connection failed',
+        severity: 'high'
+      })
+    }
+
+    // 2. Redis health check
+    try {
+      const redisHealthy = await cacheManager.isHealthy()
+      healthStatus.components.redis.status = redisHealthy ? 'healthy' : 'degraded'
+      healthStatus.components.redis.connected = redisHealthy
+      if (!redisHealthy) {
+        healthStatus.alerts.push({
+          component: 'redis',
+          message: 'Redis cache unavailable - operating in no-cache mode',
+          severity: 'medium'
+        })
+      }
+    } catch (error) {
+      healthStatus.components.redis.status = 'unhealthy'
+      healthStatus.alerts.push({
+        component: 'redis',
+        message: 'Redis health check failed',
+        severity: 'medium'
+      })
+    }
+
+    // 3. Job queue health check
+    try {
+      const queueStats = await jobQueue.getQueueStats()
+      healthStatus.components.job_queue.status = queueStats.pending > 1000 ? 'degraded' : 'healthy'
+      healthStatus.components.job_queue.pending_jobs = queueStats.pending
+      if (queueStats.pending > 1000) {
+        healthStatus.alerts.push({
+          component: 'job_queue',
+          message: `High pending job count: ${queueStats.pending}`,
+          severity: 'medium'
+        })
+      }
+    } catch (error) {
+      healthStatus.components.job_queue.status = 'unhealthy'
+      healthStatus.alerts.push({
+        component: 'job_queue',
+        message: 'Job queue health check failed',
+        severity: 'high'
+      })
+    }
+
+    // 4. AI API health check
+    healthStatus.components.ai_apis.anthropic = !!process.env.ANTHROPIC_API_KEY
+    healthStatus.components.ai_apis.openai = !!process.env.OPENAI_API_KEY
+    
+    if (!healthStatus.components.ai_apis.anthropic) {
+      healthStatus.alerts.push({
+        component: 'ai_apis',
+        message: 'Anthropic API key not configured',
+        severity: 'high'
+      })
+    }
+
+    // Determine overall health
+    const criticalAlerts = healthStatus.alerts.filter(a => a.severity === 'high')
+    const mediumAlerts = healthStatus.alerts.filter(a => a.severity === 'medium')
+    
+    if (criticalAlerts.length > 0) {
+      healthStatus.overall = 'unhealthy'
+    } else if (mediumAlerts.length > 0) {
+      healthStatus.overall = 'degraded'
+    }
+
+    console.log('🏥 Health check completed:', healthStatus.overall)
+    
+    return NextResponse.json({
+      success: true,
+      message: `System health check completed - Status: ${healthStatus.overall}`,
+      data: healthStatus
+    })
+
+  } catch (error) {
+    console.error('❌ Health check failed:', error)
+    return NextResponse.json(
+      { 
+        success: false, 
+        error: 'Health check failed',
+        message: error instanceof Error ? error.message : 'Unknown error',
+        data: {
+          overall: 'unhealthy',
+          timestamp: new Date().toISOString()
+        }
+      },
+      { status: 500 }
+    )
+  }
 }
 
 function getMilliseconds(interval: string): number {
