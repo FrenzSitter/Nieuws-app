@@ -158,7 +158,8 @@ export async function getCachedBatch<T>(
   } catch (error) {
     console.error('Batch cache operation failed:', error)
     // Fallback to executing all functions
-    for (const [key, fallback] of fallbacks) {
+    const fallbackEntries = Array.from(fallbacks.entries())
+      for (const [key, fallback] of fallbackEntries) {
       results.set(key, await fallback())
     }
     return results
