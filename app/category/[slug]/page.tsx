@@ -316,7 +316,10 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
                 summary={article.summary}
                 imageUrl={article.imageUrl}
                 publishedAt={article.publishedAt}
-                sources={article.sources?.map((source: any) => source?.name || source).filter(Boolean) || []}
+                sources={Array.isArray(article.sources) 
+                  ? article.sources.map((source: any) => String(source?.name || source || 'Unknown')).filter(Boolean)
+                  : []
+                }
                 category={article.category}
                 readingTime={article.readingTime}
                 isPerspective={article.perspectiveCount > 1}
