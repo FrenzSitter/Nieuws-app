@@ -119,9 +119,12 @@ export async function getCachedBatch<T>(
   
   if (!redis) {
     // No Redis, execute all fallbacks
-    for (const [key, fallback] of fallbacks) {
-      results.set(key, await fallback())
-    }
+    for (const key of fallbacks.keys()) {
+      const fallback = fallbacks.get(key)
+    if (fallback) {
+    results.set(key, await fallback())
+  }
+}
     return results
   }
 
