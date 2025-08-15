@@ -132,7 +132,7 @@ async function getRSSPerformanceMetrics(supabase: any, startTime: Date) {
   const avgExecutionTime = fetchLogs?.reduce((sum: number, log: any): number => sum + (log.execution_time_ms || 0), 0) / totalFetches || 0
 
   // Source reliability metrics
-  const sourcePerformance = sourceLogs?.reduce((acc, log) => {
+  const sourcePerformance = sourceLogs?.reduce((acc: any, log: any) => {
     const sourceName = log.news_sources?.name || 'Unknown'
     if (!acc[sourceName]) {
       acc[sourceName] = { total: 0, successful: 0, avgTime: 0 }
@@ -144,7 +144,7 @@ async function getRSSPerformanceMetrics(supabase: any, startTime: Date) {
   }, {} as Record<string, any>) || {}
 
   // Calculate averages
-  Object.keys(sourcePerformance).forEach(source => {
+  Object.keys(sourcePerformance).forEach((source: string) => {
     const perf = sourcePerformance[source]
     perf.successRate = (perf.successful / perf.total) * 100
     perf.avgTime = perf.avgTime / perf.total
@@ -158,9 +158,9 @@ async function getRSSPerformanceMetrics(supabase: any, startTime: Date) {
     avgExecutionTime,
     avgArticlesPerFetch: totalFetches > 0 ? totalArticles / totalFetches : 0,
     sourcePerformance: Object.entries(sourcePerformance)
-      .map(([name, perf]) => ({ source: name, ...perf }))
-      .sort((a, b) => b.successRate - a.successRate),
-    errors: fetchLogs?.reduce((acc, log) => acc.concat(log.errors || []), []) || []
+      .map(([name, perf]: [string, any]) => ({ source: name, ...perf }))
+      .sort((a: any, b: any) => b.successRate - a.successRate),
+    errors: fetchLogs?.reduce((acc: any[], log: any) => acc.concat(log.errors || []), []) || []
   }
 }
 
@@ -171,12 +171,12 @@ async function getAIProcessingMetrics(supabase: any, startTime: Date) {
     .gte('generation_timestamp', startTime.toISOString())
 
   const totalGenerated = articles?.length || 0
-  const avgConfidence = articles?.reduce((sum, article) => 
+  const avgConfidence = articles?.reduce((sum: number, article: any): number => 
     sum + (article.metadata?.confidence_score || 0), 0) / totalGenerated || 0
-  const avgProcessingTime = articles?.reduce((sum, article) => 
+  const avgProcessingTime = articles?.reduce((sum: number, article: any): number => 
     sum + (article.metadata?.processing_time_ms || 0), 0) / totalGenerated || 0
 
-  const statusBreakdown = articles?.reduce((acc, article) => {
+  const statusBreakdown = articles?.reduce((acc: Record<string, number>, article: any) => {
     const status = article.status || 'unknown'
     acc[status] = (acc[status] || 0) + 1
     return acc
@@ -188,7 +188,7 @@ async function getAIProcessingMetrics(supabase: any, startTime: Date) {
     avgProcessingTime,
     statusBreakdown,
     throughputPerHour: totalGenerated > 0 ? totalGenerated / 24 : 0, // Assuming 24h timeframe
-    highConfidenceRate: articles?.filter(a => a.metadata?.confidence_score >= 0.8).length / totalGenerated * 100 || 0
+    highConfidenceRate: articles?.filter((a: any) => a.metadata?.confidence_score >= 0.8).length / totalGenerated * 100 || 0
   }
 }
 
